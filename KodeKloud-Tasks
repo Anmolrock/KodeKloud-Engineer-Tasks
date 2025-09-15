@@ -1,0 +1,2270 @@
+Task: 1
+In alignment with security compliance standards, the Nautilus project team has opted to impose restrictions on crontab access. Specifically, only designated users will be permitted to create or update cron jobs.
+Configure crontab access on App Server 2 as follows: Allow crontab access to mark user while denying access to the garrett user.
+Solution:
+Step 1: SSH into App Server 2
+From jump host:
+ssh steve@stapp02.stratos.xfusioncorp.com
+# password: Am3ric@
+________________________________________
+Step 2: Configure crontab access control
+Cron access is controlled by two files:
+•	/etc/cron.allow → only users listed here can use crontab.
+•	/etc/cron.deny → users listed here are denied from using crontab.
+Since your requirement is:
+•	Allow mark
+•	Deny garrett
+Do this:
+echo "mark" | sudo tee /etc/cron.allow
+echo "garrett" | sudo tee /etc/cron.deny
+________________________________________
+Step 3: Verify
+Check contents of files:
+cat /etc/cron.allow
+cat /etc/cron.deny
+Expected:
+/etc/cron.allow → mark
+/etc/cron.deny  → garrett
+________________________________________
+✅ Result:
+•	mark can create and edit cron jobs (crontab -e).
+•	garrett is denied cron job access.
+
+
+Task: 2
+With the installation of new tools on the app servers within the Stratos Datacenter, certain functionalities now necessitate graphical user interface (GUI) access.
+Adjust the default runlevel on all App servers in Stratos Datacenter to enable GUI booting by default. It's imperative not to initiate a server reboot after completing this task.
+Solution:
+✅ Steps (on each App Server)
+1. SSH into each app server from the jump host
+ssh tony@stapp01.stratos.xfusioncorp.com     # password: Ir0nM@n
+ssh steve@stapp02.stratos.xfusioncorp.com    # password: Am3ric@
+ssh banner@stapp03.stratos.xfusioncorp.com   # password: BigGr33n
+2. Check current default target
+systemctl get-default
+It will likely show:
+multi-user.target
+3. Set default to GUI mode
+sudo systemctl set-default graphical.target
+4. Verify
+systemctl get-default
+It should now show:
+graphical.target
+________________________________________
+🔹 Important
+•	Do NOT reboot the servers (requirement says no reboot).
+•	This just changes the default boot target so that next reboot will start in GUI mode.
+________________________________________
+✅ After applying this on stapp01, stapp02, stapp03, all app servers will boot into GUI by default (once they are restarted later).
+
+
+
+
+
+
+Task:3
+In the daily standup, it was noted that the timezone settings across the Nautilus Application Servers in the Stratos Datacenter are inconsistent with the local datacenter's timezone, currently set to America/Manaus.
+Synchronize the timezone settings to match the local datacenter's timezone (America/Manaus).
+Solution:
+Got it 👍 This task is about making sure all App Servers (stapp01, stapp02, stapp03) have the same timezone: America/Manaus.
+________________________________________
+✅ Steps (repeat on each App Server)
+1. SSH into each App Server
+ssh tony@stapp01.stratos.xfusioncorp.com     # password: Ir0nM@n
+ssh steve@stapp02.stratos.xfusioncorp.com    # password: Am3ric@
+ssh banner@stapp03.stratos.xfusioncorp.com   # password: BigGr33n
+2. Check current timezone
+timedatectl
+3. Set timezone to America/Manaus
+sudo timedatectl set-timezone America/Manaus
+4. Verify
+timedatectl | grep "Time zone"
+Expected output:
+Time zone: America/Manaus (AMT, -0400)
+________________________________________
+🔹 Important Notes
+•	timedatectl automatically handles /etc/localtime symlink, so no need to manually link files.
+•	Apply the same change on all three App Servers.
+________________________________________
+✅ After this, all application servers will be aligned with the local datacenter timezone (America/Manaus).
+
+
+
+
+
+Task: 4
+Following a security audit, the xFusionCorp Industries security team has opted to enhance application and server security with SELinux. To initiate testing, the following requirements have been established for App server 2 in the Stratos Datacenter:
+--Install the required SELinux packages.
+--Permanently disable SELinux for the time being; it will be re-enabled after necessary configuration changes.
+--No need to reboot the server, as a scheduled maintenance reboot is already planned for tonight.
+--Disregard the current status of SELinux via the command line; the final status after the reboot should be disabled.
+Solution:
+Step 1: Connect to App Server 2
+ssh steve@stapp02
+# password: Am3ric@
+________________________________________
+🔹 Step 2: Install SELinux packages
+On CentOS/RHEL systems:
+sudo yum install -y selinux-policy selinux-policy-targeted policycoreutils
+________________________________________
+🔹 Step 3: Check SELinux config file
+Open /etc/selinux/config:
+sudo vi /etc/selinux/config
+Find this line:
+SELINUX=enforcing
+Change it to:
+SELINUX=disabled
+Save & exit.
+________________________________________
+🔹 Step 4: Verify configuration
+Check with:
+cat /etc/selinux/config | grep SELINUX
+Expected output should show:
+SELINUX=disabled
+________________________________________
+✅ Done.
+•	No need to reboot now (as per requirement).
+•	After the scheduled reboot, SELinux will remain disabled.
+
+Task: 5
+The Nautilus system admins team has rolled out a web UI application for their backup utility on the Nautilus backup server within the Stratos Datacenter. This application operates on port 5000, and firewalld is active on the server. To meet operational needs, the following requirements have been identified:
+Allow all incoming connections on port 5000/tcp. Ensure the zone is set to public.
+Solution:
+✅ Steps to Allow Port 5000 in firewalld
+1.	Check active zone (it should be public as per requirement):
+2.	sudo firewall-cmd --get-active-zones
+3.	Add rule for port 5000/tcp in the public zone:
+4.	sudo firewall-cmd --zone=public --add-port=5000/tcp --permanent
+o	--zone=public → ensures rule is applied to the public zone.
+o	--add-port=5000/tcp → allows incoming traffic on port 5000 (TCP).
+o	--permanent → makes the change persistent across reboots.
+5.	Reload firewall to apply changes:
+6.	sudo firewall-cmd --reload
+7.	Verify the rule:
+8.	sudo firewall-cmd --zone=public --list-ports
+You should see:
+5000/tcp
+________________________________________
+👉 Now the backup web UI app running on port 5000 will be accessible, and the firewall rules are aligned with security best practices.
+
+
+
+
+
+Task: 6
+In the Stratos Datacenter, our Storage server is encountering performance degradation due to excessive processes held by the nfsuser user. To mitigate this issue, we need to enforce limitations on its maximum processes. Please set the maximum process limits as specified below:
+a. Set the soft limit to 1027
+b. Set the hard limit to 2024
+
+Solution:
+✅ Steps to set process limits for nfsuser
+1.	Open the limits configuration file:
+sudo vi /etc/security/limits.conf
+2.	Add the following lines at the end of the file:
+nfsuser   soft   nproc   1027
+nfsuser   hard   nproc   2024
+3.	Save & exit the file.
+________________________________________
+✅ Verify the configuration
+Switch to nfsuser and check limits:
+su - nfsuser
+ulimit -u
+This will show the soft limit.
+To confirm hard limit:
+ulimit -Hu
+________________________________________
+⚠️ Note: These limits will apply after the user logs out and back in (new session).
+
+
+
+Task: 7
+The Nautilus development team has provided requirements to the DevOps team for a new application development project, specifically requesting the establishment of a Git repository. Follow the instructions below to create the Git repository on the Storage server in the Stratos DC:
+Utilize yum to install the git package on the Storage Server.
+Create a bare repository named /opt/official.git (ensure exact name usage).
+Solution:
+🔹 Step 1: SSH into the Storage Server
+On the jump host, you normally have to connect to the storage server like:
+ssh natasha@ststor01
+# or whatever Storage Server credentials are provided
+________________________________________
+🔹 Step 2: Install Git using yum
+Once you’re inside the Storage Server:
+sudo yum install -y git
+This installs the Git package. ✅
+________________________________________
+🔹 Step 3: Create the bare repository
+A bare repository is usually used for remote collaboration (it doesn’t have a working directory).
+Run:
+sudo mkdir -p /opt/official.git
+sudo git init --bare /opt/official.git
+This creates the bare repo at /opt/official.git. ✅
+________________________________________
+🔹 Step 4: Verify
+Check that the repository is bare:
+git --git-dir=/opt/official.git status
+You should see something like:
+fatal: This operation must be run in a work tree
+(which confirms it’s bare).
+Or check inside:
+ls /opt/official.git
+You’ll see folders like branches, hooks, objects, refs, etc.
+
+
+Task: 8
+The DevOps team established a new Git repository last week, which remains unused at present. However, the Nautilus application development team now requires a copy of this repository on the Storage Server in the Stratos DC. Follow the provided details to clone the repository:
+The repository to be cloned is located at /opt/media.git
+Clone this Git repository to the /usr/src/kodekloudrepos directory. Ensure no modifications are made to the repository during the cloning process.
+Solution:
+🔹 Steps:
+1.	Check if Git is installed (if not, install it):
+yum install -y git
+2.	Navigate to the target parent directory:
+cd /usr/src
+3.	Clone the given repository into the specified directory:
+git clone /opt/media.git kodekloudrepos
+👉 This command clones /opt/media.git into /usr/src/kodekloudrepos.
+4.	Verify the cloned repo:
+cd /usr/src/kodekloudrepos
+ls -la
+git status
+You should see all the repository files and git status should show "On branch master" (or main)" with nothing to commit.
+________________________________________
+✅ Task completed: You have successfully cloned /opt/media.git to /usr/src/kodekloudrepos.
+
+
+
+
+Task: 9
+The Nautilus application development team has been working on a project repository /opt/cluster.git. This repo is cloned at /usr/src/kodekloudrepos on storage server in Stratos DC. They recently shared the following requirements with DevOps team:
+Create a new branch datacenter in /usr/src/kodekloudrepos/cluster repo from master and copy the /tmp/index.html file (present on storage server itself) into the repo. Further, add/commit this file in the new branch and merge back that branch into master branch. Finally, push the changes to the origin for both of the branches.
+Solution:
+Got it ✅ This is a Git branching + file addition + merge + push workflow task. Let’s break it step by step exactly for your KodeKloud lab scenario:
+________________________________________
+✅ Steps to Solve
+1.	Go to the repo
+cd /usr/src/kodekloudrepos/cluster
+2.	Ensure you’re on master branch
+git checkout master
+3.	Create and switch to the new branch datacenter
+git checkout -b datacenter
+4.	Copy the required file into the repo
+cp /tmp/index.html .
+5.	Add & commit the file
+git add index.html
+git commit -m "Add index.html file in datacenter branch"
+6.	Switch back to master branch
+git checkout master
+7.	Merge datacenter branch into master
+git merge datacenter
+8.	Push both branches to origin
+git push origin master
+git push origin datacenter
+________________________________________
+🔑 Key Checks
+•	Ensure remote origin is already set (it usually is if cloned from /opt/cluster.git). You can verify with:
+•	git remote -v
+•	Validate branches exist:
+•	git branch -a
+•	Confirm commit is visible in both master & datacenter before pushing.
+Task: 10
+The Nautilus DevOps team is delving into Kubernetes for app management. One team member needs to create a deployment following these details:
+Create a deployment named httpd to deploy the application httpd using the image httpd:latest (ensure to specify the tag)
+
+Note: The kubectl utility on jump_host is set up to interact with the Kubernetes cluster.
+Solution:
+✅ Solution Steps
+1.	SSH into the jump_host
+ssh thor@jump_host.stratos.xfusioncorp.com
+# password: mjolnir123
+2.	Create the deployment
+kubectl create deployment httpd --image=httpd:latest
+3.	Verify the deployment
+kubectl get deployments
+You should see:
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+httpd   1/1     1            1           xx s
+4.	Check pods
+kubectl get pods
+It should show a pod running from the httpd:latest image.
+________________________________________
+📌 Important Notes
+•	kubectl create deployment automatically creates the deployment and replica set with 1 replica by default.
+•	The :latest tag must be explicitly mentioned (which you already did with httpd:latest).
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 11
+The Nautilus system admins team has prepared scripts to automate several day-to-day tasks. They want them to be deployed on all app servers in Stratos DC on a set schedule. Before that they need to test similar functionality with a sample cron job. Therefore, perform the steps below:
+a. Install cronie package on all Nautilus app servers and start crond service.
+
+b. Add a cron */5 * * * * echo hello > /tmp/cron_text for root user.
+Solution:
+✅ Steps to Solve
+1. Connect to each App Server
+From jump_host, SSH into all 3 app servers one by one:
+ssh tony@stapp01
+# password: Ir0nM@n
+
+ssh steve@stapp02
+# password: Am3ric@
+
+ssh banner@stapp03
+# password: BigGr33n
+________________________________________
+2. Switch to root
+sudo su -
+________________________________________
+3. Install cronie package
+yum install -y cronie
+________________________________________
+4. Start and enable crond service
+systemctl start crond
+systemctl enable crond
+systemctl status crond
+________________________________________
+5. Add the cron job for root
+Edit root’s crontab:
+crontab -e
+Add this line:
+*/5 * * * * echo hello > /tmp/cron_text
+Save and exit.
+________________________________________
+6. Verify the cron job
+Check if the job is added:
+crontab -l
+Wait 5 minutes, then check:
+cat /tmp/cron_text
+You should see:
+Hello
+Task: 12
+The xFusionCorp development team added updates to the project that is maintained under /opt/beta.git repo and cloned under /usr/src/kodekloudrepos/beta. Recently some changes were made on Git server that is hosted on Storage server in Stratos DC. The DevOps team added some new Git remotes, so we need to update remote on /usr/src/kodekloudrepos/beta repository as per details mentioned below:
+
+a. In /usr/src/kodekloudrepos/beta repo add a new remote dev_beta and point it to /opt/xfusioncorp_beta.git repository.
+
+b. There is a file /tmp/index.html on same server; copy this file to the repo and add/commit to master branch.
+
+c. Finally push master branch to this new remote origin.
+Solution:
+✅ Steps to Perform:
+1.	Go to the repo directory
+cd /usr/src/kodekloudrepos/beta
+2.	Add new remote dev_beta pointing to /opt/xfusioncorp_beta.git:
+git remote add dev_beta /opt/xfusioncorp_beta.git
+3.	Verify the remote was added correctly:
+git remote -v
+4.	Copy the file /tmp/index.html into the repo:
+cp /tmp/index.html .
+5.	Add the file to staging:
+git add index.html
+6.	Commit the file to master branch:
+git commit -m "Added index.html file"
+7.	Push master branch to the new remote (dev_beta):
+git push dev_beta master
+________________________________________
+👉 After these steps, your index.html will be committed in the master branch and pushed to the new remote dev_beta.
+
+
+
+
+Task: 13
+The Nautilus DevOps team is planning to deploy some micro services on Kubernetes platform. The team has already set up a Kubernetes cluster and now they want to set up some namespaces, deployments etc. Based on the current requirements, the team has shared some details as below:
+
+
+Create a namespace named dev and deploy a POD within it. Name the pod dev-nginx-pod and use the nginx image with the latest tag. Ensure to specify the tag as nginx:latest.
+
+Note: The kubectl utility on jump_host is configured to operate with the Kubernetes cluster.
+Solution:
+✅ Steps:
+1.	Create the namespace dev:
+kubectl create namespace dev
+2.	Create the pod in that namespace with nginx:latest:
+kubectl run dev-nginx-pod --image=nginx:latest -n dev
+3.	Verify the pod and namespace:
+kubectl get namespaces
+kubectl get pods -n dev
+________________________________________
+🔍 Expected Output:
+NAME           STATUS   AGE
+dev-nginx-pod  Running  20s
+
+
+
+
+
+
+
+
+
+
+Task: 14
+A Nautilus developer has stored confidential data on the jump host within Stratos DC. To ensure security and compliance, this data must be transferred to one of the app servers. Given developers lack direct access to these servers, the system admin team has been enlisted for assistance.
+
+Copy /tmp/nautilus.txt.gpg file from jump server to App Server 3 placing it in the directory /home/data.
+Solution:
+Step 1: Connect to the jump host
+ssh your_user@jump_host
+________________________________________
+Step 2: Verify the file exists
+ls -l /tmp/nautilus.txt.gpg
+You should see the confidential file.
+________________________________________
+Step 3: Copy file to App Server 3
+From the jump host, use scp to securely copy the file to App Server 3:
+scp /tmp/nautilus.txt.gpg tony@stapp03:/home/data/
+Here:
+•	tony → username for App Server 3 (based on typical Nautilus lab setups).
+•	stapp03 → hostname for App Server 3.
+•	/home/data/ → target directory.
+________________________________________
+Step 4: Validate on App Server 3
+Log in to App Server 3:
+ssh tony@stapp03
+Then check the directory:
+ls -l /home/data/nautilus.txt.gpg
+You should see the file successfully copied.
+________________________________________
+✅ Done! File securely transferred from jump host → App Server 3 in /home/data/.
+Task: 15
+The system admin team at xFusionCorp Industries has streamlined access management by implementing group-based access control. Here's what you need to do:
+a. Create a group named nautilus_developers across all App servers within the Stratos Datacenter.
+b. Add the user rajesh into the nautilus_developers group on all App servers. If the user doesn't exist, create it as well.
+Note: You can find the infrastructure details by clicking on the Details of all Users and Servers button on the top-right section of the page.
+Solution:
+✅ Steps to Perform:
+1. SSH into each App server
+From the jump host:
+ssh tony@stapp01
+ssh steve@stapp02
+ssh banner@stapp03
+(Passwords are given in the infrastructure details.)
+________________________________________
+2. Create the group
+On each App server:
+sudo groupadd nautilus_developers
+If the group already exists, this will throw an error, but you can safely ignore it.
+________________________________________
+3. Check if user rajesh exists
+id rajesh
+•	If the user exists, proceed to add them to the group.
+•	If not, create the user first:
+sudo useradd rajesh
+________________________________________
+4. Add rajesh to the group
+sudo usermod -aG nautilus_developers rajesh
+________________________________________
+5. Verify
+Run:
+id rajesh
+You should see nautilus_developers listed in the groups.
+________________________________________
+6. Repeat on all App servers
+•	stapp01.stratos.xfusioncorp.com
+•	stapp02.stratos.xfusioncorp.com
+•	stapp03.stratos.xfusioncorp.com
+Task: 16
+To accommodate the backup agent tool's specifications, the system admin team at xFusionCorp Industries requires the creation of a user with a non-interactive shell. Here's your task:
+
+Create a user named javed with a non-interactive shell on App Server 3.
+
+Note: You can find the infrastructure details by clicking on the Details of all Users and Servers button on the top-right section of the page.
+Solution:
+🔹 Step-by-step Solution
+1.	SSH into App Server 3
+From jump host:
+ssh banner@stapp03
+(password: BigGr33n)
+________________________________________
+2.	Create the user javed with a non-interactive shell
+We can use /sbin/nologin or /bin/false as the shell.
+Best practice: /sbin/nologin.
+sudo useradd -s /sbin/nologin javed
+________________________________________
+3.	Verify the user
+Check the entry in /etc/passwd:
+grep javed /etc/passwd
+You should see something like:
+javed:x:1003:1003::/home/javed:/sbin/nologin
+This confirms that javed exists and cannot log in interactively.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 17
+As part of the temporary assignment to the Nautilus project, a developer named ammar requires access for a limited duration. To ensure smooth access management, a temporary user account with an expiry date is needed. Here's what you need to do:
+
+
+Create a user named ammar on App Server 3 in Stratos Datacenter. Set the expiry date to 2023-12-07, ensuring the user is created in lowercase as per standard protocol.
+
+Note: You can find the infrastructure details by clicking on the Details of all Users and Servers button on the top-right section of the page.
+Solution:
+🔹 Steps to Solve
+1.	Login to App Server 3 (using jump host if required):
+ssh banner@stapp03
+(password is usually BigGr33n in labs)
+________________________________________
+2.	Create user ammar with an expiry date (2023-12-07)
+We use the -e flag with useradd to set expiry.
+sudo useradd -e 2023-12-07 ammar
+________________________________________
+3.	Verify the user expiry
+Run:
+sudo chage -l ammar
+
+
+You should see something like:
+Last password change                                   			   : Aug 20, 2025
+Password expires                                     	       			   : never
+Account expires                                                			   : Dec 07, 2023
+Minimum number of days between password change          : 0
+Maximum number of days between password change          : 99999
+Number of days of warning before password expires       	    : 7
+
+That confirms the user account will automatically expire on 07-Dec-2023.
+
+Note:
+1.	Check user expiry details		= 	chage -l ammar
+2.	Set account expiry			=	sudo chage -E 2023-12-07 ammar
+3.	Set password expiry (force user to change password)  =    sudo chage -d 0 ammar
+4.	Set maximum password validity	=	sudo chage -M 90 ammar
+5.	-m (minimum days between password changes) =sudo chage -m 7 username
+6.	-W (password expiration warning days) = sudo chage -W 10 username
+7.	-I (inactive days after password expiry) = 	sudo chage -I 15 username
+8.	-h (help)	=	chage -h
+9.	Example: Set full policy=sudo chage -M 90 -m 7 -W 10 -I 15 -E 2023-12-07 ammar
+
+Task: 18
+In response to the latest tool implementation at xFusionCorp Industries, the system admins require the creation of a service user account. Here are the specifics:
+Create a user named kirsty in App Server 3 without a home directory.
+Solution:
+Command:
+sudo useradd -M Kirsty
+Verification:
+id kirsty
+ls -ld /home/kirsty
+•	id kirsty will show the user exists.
+•	/home/kirsty should not exist.
+
+Note:
+Important useradd Flags
+1.	-m
+o	Create the user’s home directory (default /home/username).
+o	Example:
+o	sudo useradd -m anmol
+2.	-M
+o	Do not create a home directory.
+o	Used for service users (like your task with kirsty).
+3.	-s SHELL
+o	Specify the login shell.
+o	Example:
+o	sudo useradd -s /bin/bash anmol
+o	sudo useradd -s /sbin/nologin backupuser
+4.	-d HOME_DIR
+o	Set a custom home directory path.
+o	Example:
+o	sudo useradd -m -d /opt/devhome devuser
+5.	-e YYYY-MM-DD
+o	Set an account expiry date.
+o	Example:
+o	sudo useradd -e 2023-12-31 tempuser
+6.	-g GROUP
+o	Specify the primary group.
+o	Example:
+o	sudo useradd -g developers devuser
+7.	-G GROUPS
+o	Add the user to supplementary (secondary) groups.
+o	Example:
+o	sudo useradd -G docker,sudo devuser
+8.	-u UID
+o	Assign a specific user ID instead of auto.
+o	Example:
+o	sudo useradd -u 1050 customuser
+9.	-c COMMENT
+o	Add a description (stored in /etc/passwd).
+o	Example:
+o	sudo useradd -c "Project Developer" devuser
+10.	-r
+o	Create a system account (UID < 1000 usually).
+o	Example:
+o	sudo useradd -r serviceuser
+
+
+
+Task: 19
+Following security audits, the xFusionCorp Industries security team has rolled out new protocols, including the restriction of direct root SSH login.
+
+Your task is to disable direct SSH root login on all app servers within the Stratos Datacenter.
+
+Solution:
+
+🔹 What the task is asking:
+•	Goal: Prevent root from logging in directly over SSH.
+•	Reason: Improves security — attackers cannot brute-force the root account.
+•	Target servers: All App Servers (stapp01, stapp02, stapp03).
+________________________________________
+🔹 Steps to Complete:
+1.	SSH into each App Server (or use a loop/script from jump host):
+ssh tony@stapp01   # stapp01
+ssh steve@stapp02   # stapp02
+ssh banner@stapp03  # stapp03
+2.	Edit the SSH configuration file:
+sudo vi /etc/ssh/sshd_config
+Look for the line:
+#PermitRootLogin yes
+Change it to:
+PermitRootLogin no
+•	no → disables direct root login.
+•	yes → allows root login (default is usually yes).
+⚡ Tip: Remove the # if it’s commented out.
+3.	Restart SSH service to apply changes:
+sudo systemctl restart sshd
+or (on some systems):
+sudo service sshd restart
+4.	Verify:
+•	Try logging in as root:
+ssh root@stapp01
+•	You should see:
+Permission denied, please try again.
+✅ That confirms root login is disabled.
+
+
+
+
+
+
+
+
+
+Task: 20
+As part of the temporary assignment to the Nautilus project, a developer named ravi requires access for a limited duration. To ensure smooth access management, a temporary user account with an expiry date is needed. Here's what you need to do:
+
+
+
+Create a user named ravi on App Server 2 in Stratos Datacenter. Set the expiry date to 2024-01-28, ensuring the user is created in lowercase as per standard protocol.
+
+
+Solution
+✅ Steps to Create a Temporary User with Expiry
+1.	Login to App Server 2 from jumphost:
+2.	ssh tony@stapp02
+(use the provided credentials like in your earlier tasks)
+3.	Create user ravi with expiry date:
+4.	sudo useradd -e 2024-01-28 ravi
+o	-e → sets expiry date (format: YYYY-MM-DD)
+o	username ravi must be lowercase (standard Linux protocol)
+5.	Set a password for ravi:
+6.	sudo passwd ravi
+7.	Verify expiry is set correctly:
+8.	sudo chage -l ravi
+You should see:
+Account expires : Jan 28, 2024
+________________________________________
+⚡ That’s it — now user ravi exists but will automatically expire on 2024-01-28.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 21
+In a bid to automate backup processes, the xFusionCorp Industries sysadmin team has developed a new bash script named xfusioncorp.sh. While the script has been distributed to all necessary servers, it lacks executable permissions on App Server 3 within the Stratos Datacenter.
+
+
+
+Your task is to grant executable permissions to the /tmp/xfusioncorp.sh script on App Server 3. Additionally, ensure that all users have the capability to execute it.
+
+Solution:
+🔹 Steps
+1.	Login to Jump Host (thor):
+2.	ssh thor@jump_host.stratos.xfusioncorp.com
+3.	SSH into App Server 3 (stapp03):
+4.	ssh banner@stapp03
+Password: BigGr33n
+5.	Switch to root (if required):
+6.	sudo su -
+7.	Grant execute permission to all users:
+8.	chmod a+x /tmp/xfusioncorp.sh
+o	a+x → gives execute permission to user, group, and others.
+9.	Verify permissions:
+10.	ls -l /tmp/xfusioncorp.sh
+You should see something like:
+-rwxr-xr-x 1 root root 1234 Aug 21 12:34 /tmp/xfusioncorp.sh
+________________________________________
+✅ Now the script is executable by everyone on stapp03.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 22
+The system admins team of xFusionCorp Industries has set up some scripts on jump host that run on regular intervals and perform operations on all app servers in Stratos Datacenter. To make these scripts work properly we need to make sure the thor user on jump host has password-less SSH access to all app servers through their respective sudo users (i.e tony for app server 1). Based on the requirements, perform the following:
+Set up a password-less authentication from user thor on jump host to all app servers through their respective sudo users.
+Solution:
+🚀 Task: Password-less SSH Setup (thor → app servers)
+Objective:
+•	From thor (jump host), login to all App servers without typing password.
+•	Must connect via the respective sudo users (tony, steve, banner).
+________________________________________
+Step 1: Switch to thor user on Jump Host
+su - thor
+________________________________________
+Step 2: Generate SSH Key (on jump host)
+ssh-keygen -t rsa -b 2048
+•	Just press Enter for all prompts (don’t set a passphrase).
+•	This creates:
+o	Private key → /home/thor/.ssh/id_rsa
+o	Public key → /home/thor/.ssh/id_rsa.pub
+________________________________________
+Step 3: Copy Public Key to Each App Server
+Use ssh-copy-id to copy the key to each server:
+ssh-copy-id tony@<stapp01_ip>
+ssh-copy-id steve@<stapp02_ip>
+ssh-copy-id banner@<stapp03_ip>
+(Replace <stapp0X_ip> with the actual server IPs — in AWS EC2 you’ll use your instance public IPs.)
+________________________________________
+Step 4: Test SSH Login
+Now you should be able to SSH without a password:
+ssh tony@<stapp01_ip>
+ssh steve@<stapp02_ip>
+ssh banner@<stapp03_ip>
+________________________________________
+Step 5: Verify sudo Access
+Once logged in as tony/steve/banner, check they have sudo:
+sudo -l
+________________________________________
+✅ Recap (Key Notes)
+•	Generate SSH keys on Jump Host.
+•	Distribute public key to ~/.ssh/authorized_keys of app server sudo users.
+•	Verify password-less login.
+•	Useful for automation scripts (cron, Ansible, Jenkins, etc.).
+Task: 23
+During the weekly meeting, the Nautilus DevOps team discussed about the automation and configuration management solutions that they want to implement. While considering several options, the team has decided to go with Ansible for now due to its simple setup and minimal pre-requisites. The team wanted to start testing using Ansible, so they have decided to use jump host as an Ansible controller to test different kind of tasks on rest of the servers.
+
+Install ansible version 4.7.0 on Jump host using pip3 only. Make sure Ansible binary is available globally on this system, i.e all users on this system are able to run Ansible commands.
+
+Solution:
+🔹 Task: Install Ansible 4.7.0 on Jump Host using pip3 only
+✔ Ansible should be installed via pip3 (not yum/apt).
+✔ Binary must be available globally (so not just for one user).
+________________________________________
+✅ Step-by-step Explanation
+1.	Make sure pip3 is installed
+2.	python3 -m pip --version
+If not available, install:
+sudo yum install -y python3-pip   # RHEL/CentOS
+sudo apt-get install -y python3-pip   # Ubuntu/Debian
+3.	Install Ansible 4.7.0 globally with pip3
+4.	sudo pip3 install ansible==4.7.0
+Using sudo makes the installation available to all users on the system (global).
+5.	Verify installation
+6.	ansible --version
+Output should show:
+ansible [core 2.11.x] 
+config file = ...
+(Ansible 4.7.0 is based on ansible-core 2.11.x — so don’t get confused if you see both.)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 24
+There is a critical issue going on with the Nautilus application in Stratos DC. The production support team identified that the application is unable to connect to the database. After digging into the issue, the team found that mariadb service is down on the database server.
+
+Look into the issue and fix the same.
+
+Solution:
+
+1. At first login on database server  &  Switch to  root user 
+2. When you start the mariadb service you will get below error
+3. systemctl start  mariadb
+4. systemctl status mariadb -l 
+5. List the  MY SQL following path check ownership, groups and directory name
+	 ll  /var/lib/
+6. If the Ownership is correct check the folder name & rename accordingly 
+mv /var/lib/mysqld/ /var/lib/mysql
+	ll /var/lib/
+7. Start service: systemctl start  mariadb &&  systemctl status  mariadb
+chown -R mysql:mysql /var/lib/mysql
+chmod 755 /var/lib/mysql/mysql
+chmod 755 /var/lib/mysql/performance_schema
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 25
+The Nautilus application development team was working on a git repository /usr/src/kodekloudrepos/games present on Storage server in Stratos DC. However, they reported an issue with the recent commits being pushed to this repo. They have asked the DevOps team to revert repo HEAD to last commit. Below are more details about the task:
+
+In /usr/src/kodekloudrepos/games git repository, revert the latest commit ( HEAD ) to the previous commit (JFYI the previous commit hash should be with initial commit message ).
+
+Use revert games message (please use all small letters for commit message) for the new revert commit.
+Solution:
+✅ Solution Steps
+1.	Go to the repo:
+cd /usr/src/kodekloudrepos/games
+2.	Check commits:
+git log --oneline
+3.	Revert the latest commit (HEAD):
+git revert HEAD
+4.	Then don’t type any message in a file press “:wq!”
+5.	Type Git add .
+6.	Then git commit -m “revert games”
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 26
+The Nautilus DevOps team has noticed performance issues in some Kubernetes-hosted applications due to resource constraints. To address this, they plan to set limits on resource utilization. Here are the details:
+
+Create a pod named httpd-pod with a container named httpd-container. Use the httpd image with the latest tag (specify as httpd:latest). Set the following resource limits:
+Requests: Memory: 15Mi, CPU: 100m
+Limits: Memory: 20Mi, CPU: 100m
+Note: The kubectl utility on jump_host is configured to operate with the Kubernetes cluster.
+Solution:
+For this task, you need to create a Pod manifest YAML file with resource requests and limits defined.
+Here’s the correct httpd-pod.yaml you should use:
+# vi httpd-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: httpd-pod
+spec:
+  containers:
+    - name: httpd-container
+      image: httpd:latest
+      resources:
+        requests:
+          memory: "15Mi"
+          cpu: "100m"
+        limits:
+          memory: "20Mi"
+          cpu: "100m"
+
+Steps to apply:
+# Create the pod
+kubectl apply -f httpd-pod.yaml
+
+# Verify pod creation
+kubectl get pods
+
+# Check resource requests/limits applied
+kubectl describe pod httpd-pod
+This will ensure the pod runs with the specified resource requests and limits.
+
+
+
+Task: 27
+The Nautilus team doesn't want its data to be accessed by any of the other groups/teams due to security reasons and want their data to be strictly accessed by the devops group of the team.
+
+
+Setup a collaborative directory /devops/data on app server 1 in Stratos Datacenter.
+
+The directory should be group owned by the group devops and the group should own the files inside the directory. The directory should be read/write/execute to the user and group owners, and others should not have any access.
+Solution:
+✅ Step-by-Step Solution
+1.	SSH into App Server 1
+From the jump host:
+ssh tony@stapp01
+# password: Ir0nM@n
+________________________________________
+2.	Ensure devops group exists
+getent group devops || sudo groupadd devops
+________________________________________
+3.	Create the directory
+sudo mkdir -p /devops/data
+________________________________________
+4.	Set group ownership to devops
+sudo chown :devops /devops/data
+________________________________________
+5.	Set proper permissions (770)
+This gives user + group full rights, and others no access.
+sudo chmod 770 /devops/data
+________________________________________
+6.	Enable SGID bit (so new files inherit the devops group automatically):
+sudo chmod g+s /devops/data
+________________________________________
+🔍 Verification
+ls -ld /devops/data
+Expected output:
+drwxrws--- 2 root devops 4096 Sep 3 12:00 /devops/data
+•	rwx for owner ✅
+•	rws for group (s means SGID set) ✅
+•	--- for others (no access) ✅
+•	Group = devops ✅
+
+
+
+
+Task: 28
+The Nautilus application development team has been working on a project repository /opt/beta.git. This repo is cloned at /usr/src/kodekloudrepos on storage server in Stratos DC. They recently shared the following requirements with the DevOps team:
+
+There are two branches in this repository, master and feature. One of the developers is working on the feature branch and their work is still in progress, however they want to merge one of the commits from the feature branch to the master branch, the message for the commit that needs to be merged into master is Update info.txt. Accomplish this task for them, also remember to push your changes eventually.
+Solution:
+Go into the actual repo folder
+1.	cd /usr/src/kodekloudrepos/beta
+2.	Verify it’s a git repo
+3.	ls -a
+You should see a .git folder.
+Now check branches
+4.	git branch -a
+Switch to feature branch
+5.	git checkout feature
+Find the commit with message “Update info.txt”
+6.	git log --oneline | grep "Update info.txt"
+Note down the commit hash (let’s say it’s abc1234).
+Switch to master
+7.	git checkout master
+Cherry-pick that commit
+8.	git cherry-pick abc1234
+Push to remote
+9.	git push origin master
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 29
+An application currently running on the Kubernetes cluster employs the nginx web server. The Nautilus application development team has introduced some recent changes that need deployment. They've crafted an image nginx:1.19 with the latest updates.
+
+Execute a rolling update for this application, integrating the nginx:1.19 image. The deployment is named nginx-deployment.
+
+Ensure all pods are operational post-update.
+
+Note: The kubectl utility on jump_host is set up to operate with the Kubernetes cluster
+Solution:
+1. Check current deployment
+kubectl get deployments
+________________________________________
+2. Perform rolling update with new image
+kubectl set image deployment/nginx-deployment nginx=nginx:1.19
+•	Here, nginx is the container name inside the deployment spec.
+•	If you’re unsure, you can check it with:
+•	kubectl describe deployment nginx-deployment | grep -i "Container Name"
+________________________________________
+3. Monitor the rollout status
+kubectl rollout status deployment/nginx-deployment
+________________________________________
+4. Verify all pods are running
+kubectl get pods -o wide
+You should see all replicas of nginx-deployment running with the new image.
+________________________________________
+✅ This ensures a rolling update (no downtime, pods are updated gradually).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 30
+There is some data on Nautilus App Server 3 in Stratos DC. Data needs to be altered in several of the files. On Nautilus App Server 3, alter the /home/BSD.txt file as per details given below:
+
+
+
+a. Delete all lines containing word software and save results in /home/BSD_DELETE.txt file. (Please be aware of case sensitivity)
+
+
+b. Replace all occurrence of word and to them and save results in /home/BSD_REPLACE.txt file.
+
+
+Note: Let's say you are asked to replace word to with from. In that case, make sure not to alter any words containing the string itself; for example upto, contributor etc.
+Solution:
+a. Delete all lines containing word software
+Case-sensitive → so only exact software (not Software, SOFTWARE).
+Command:
+grep -v "software" /home/BSD.txt > /home/BSD_DELETE.txt
+•	grep -v → excludes matching lines.
+•	Output is saved into /home/BSD_DELETE.txt.
+________________________________________
+b. Replace all occurrence of word and with them
+We must replace only the standalone word and, not part of another word (like android).
+For this we use sed with word boundaries (\b):
+sed 's/\band\b/them/g' /home/BSD.txt > /home/BSD_REPLACE.txt
+•	\b → ensures it matches only the word and.
+•	g → replace all occurrences per line.
+•	Output is saved into /home/BSD_REPLACE.txt.
+________________________________________
+✅ After running these, you’ll have:
+•	/home/BSD_DELETE.txt → file without any lines containing “software”.
+•	/home/BSD_REPLACE.txt → file with and replaced by them.
+
+
+
+
+
+
+
+
+
+
+Task: 31
+Earlier today, the Nautilus DevOps team deployed a new release for an application. However, a customer has reported a bug related to this recent release. Consequently, the team aims to revert to the previous version.
+
+
+There exists a deployment named nginx-deployment; initiate a rollback to the previous revision.
+
+Note: The kubectl utility on jump_host is configured to interact with the Kubernetes cluster.
+Solution:
+🔧 Step 1: Check Deployment History
+kubectl rollout history deployment/nginx-deployment
+This will show all revisions with their change-cause.
+Example output:
+deployment.apps/nginx-deployment 
+REVISION  CHANGE-CAUSE
+1         kubectl apply --filename=nginx.yaml
+2         kubectl set image deployment/nginx-deployment nginx-container=nginx:1.19
+________________________________________
+🔧 Step 2: Rollback to Previous Revision
+kubectl rollout undo deployment/nginx-deployment
+•	By default, this reverts to the last revision.
+•	If you want to roll back to a specific revision:
+kubectl rollout undo deployment/nginx-deployment --to-revision=1
+________________________________________
+🔧 Step 3: Confirm Status
+kubectl rollout status deployment/nginx-deployment
+
+This ensures the rollback completed successfully and all pods are running again.
+
+✅ After rollback, the deployment will return to the previous working version (before the buggy release).
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 32
+Max want to push some new changes to one of the repositories but we don't want people to push directly to master branch, since that would be the final version of the code. It should always only have content that has been reviewed and approved. We cannot just allow everyone to directly push to the master branch. So, let's do it the right way as discussed below:
+==SSH into storage server using user max, password Max_pass123 . There you can find an already cloned repo under Max user's home.
+==Max has written his story about The 🦊 Fox and Grapes 🍇
+==Max has already pushed his story to remote git repository hosted on Gitea branch story/fox-and-grapes
+==Check the contents of the cloned repository. Confirm that you can see Sarah's story and history of commits by running git log and validate author info, commit message etc.
+==Max has pushed his story, but his story is still not in the master branch. Let's create a Pull Request(PR) to merge Max's story/fox-and-grapes branch into the master branch
+==Click on the Gitea UI button on the top bar. You should be able to access the Gitea page.
+==UI login info:
+- Username: max
+- Password: Max_pass123
+==PR title : Added fox-and-grapes story
+==PR pull from branch: story/fox-and-grapes (source)
+==PR merge into branch: master (destination)
+==Before we can add our story to the master branch, it has to be reviewed. So, let's ask tom to review our PR by assigning him as a reviewer
+==Add tom as reviewer through the Git Portal UI
+==Go to the newly created PR
+==Click on Reviewers on the right
+==Add tom as a reviewer to the PR
+==Now let's review and approve the PR as user Tom
+==Login to the portal with the user tom
+==Logout of Git Portal UI if logged in as max
+UI login info:
+- Username: tom
+- Password: Tom_pass123
+==PR title : Added fox-and-grapes story
+==Review and merge it.
+==Great stuff!! The story has been merged! 👏
+==Note: For these kind of scenarios requiring changes to be done in a web UI, please take screenshots so that you can share it with us for review in case your task is marked incomplete. You may also consider using a screen recording software such as loom.com to record and share your work.
+Solution:
+🔑 Steps
+1. SSH into Storage Server as Max
+ssh max@ststor01.stratos.xfusioncorp.com
+# password: Max_pass123
+2. Check Repository
+cd /home/max/<repo-name>
+git log --oneline --author="Max"
+•	Verify you see commits by Sarah and Max.
+•	Verify Max’s commit message: Added fox-and-grapes story.
+3. Open Gitea UI
+•	On the jump host/browser → Click Gitea UI button on the top bar.
+•	Login using:
+o	Username: max
+o	Password: Max_pass123
+4. Create a Pull Request (PR)
+•	Navigate to the repository in Gitea.
+•	Switch to branch: story/fox-and-grapes.
+•	Click New Pull Request.
+•	Fill PR details:
+o	Title: Added fox-and-grapes story
+o	Source (pull from): story/fox-and-grapes
+o	Destination (merge into): master
+•	Submit PR.
+5. Assign Reviewer (Tom)
+•	Open the newly created PR.
+•	On the right-hand side → Reviewers section.
+•	Assign reviewer: tom.
+6. Review as Tom
+•	Logout from Gitea UI (Max’s account).
+•	Login with:
+o	Username: tom
+o	Password: Tom_pass123
+•	Open the PR → Review → Approve → Merge.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 33
+==The system admins team of xFusionCorp Industries has set up some scripts on jump host that run on regular intervals and perform operations on all app servers in Stratos Datacenter. To make these scripts work properly we need to make sure the thor user on jump host has password-less SSH access to all app servers through their respective sudo users (i.e tony for app server 1). Based on the requirements, perform the following:
+==Set up a password-less authentication from user thor on jump host to all app servers through their respective sudo users.
+Solution: 
+1. Login to jump host as thor
+You should already be thor on the jump host. If not:
+ssh thor@jump_host
+________________________________________
+2. Generate SSH keys (if not already created)
+ssh-keygen -t rsa -b 2048
+•	Press Enter for all prompts (no passphrase).
+This creates:
+•	Public key → /home/thor/.ssh/id_rsa.pub
+•	Private key → /home/thor/.ssh/id_rsa
+________________________________________
+3. Copy thor’s public key to each app server’s sudo user
+App Server 1 (tony@stapp01)
+ssh-copy-id tony@stapp01
+Enter password: Ir0nM@n
+App Server 2 (steve@stapp02)
+ssh-copy-id steve@stapp02
+Enter password: Am3ric@
+App Server 3 (banner@stapp03)
+ssh-copy-id banner@stapp03
+Enter password: BigGr33n
+4. Verify password-less login works
+From jump host as thor:
+ssh tony@stapp01 hostname
+ssh steve@stapp02 hostname
+ssh banner@stapp03 hostname
+Each should return the hostname (stapp01.stratos.xfusioncorp.com, etc.) without asking for a password.
+5. Fix permissions if needed (on app servers)
+If password-less login still fails, log in using password and check:
+ls -ld ~/.ssh
+ls -l ~/.ssh/authorized_keys
+Correct them:
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+________________________________________
+✅ After this, thor on jump host will have password-less SSH access to all 3 app servers through their sudo users.
+Task: 34
+The Nautilus application development team was working on a git repository /usr/src/kodekloudrepos/official present on Storage server in Stratos DC. This was just a test repository and one of the developers just pushed a couple of changes for testing, but now they want to clean this repository along with the commit history/work tree, so they want to point back the HEAD and the branch itself to a commit with message add data.txt file. Find below more details:
+In /usr/src/kodekloudrepos/official git repository, reset the git commit history so that there are only two commits in the commit history i.e initial commit and add data.txt file.
+Also make sure to push your changes.
+Solution:
+🔑 Step-by-step solution:
+1️⃣ Go to the repository directory
+cd /usr/src/kodekloudrepos/official
+2️⃣ View the commit history and find the commit hash with message add data.txt file
+git log --oneline
+Find the commit hash, for example:
+abc1234 add data.txt file
+def5678 initial commit
+3️⃣ Reset the repository to the specific commit and remove all newer commits
+git reset --hard abc1234
+This moves the HEAD and current branch to the commit add data.txt file, removing commits that came after it.
+________________________________________
+4️⃣ Now create a new branch with only the two commits
+Since we also need the initial commit, we can reset the branch to initial commit, cherry-pick the second commit, and force push.
+First, reset to initial commit:
+git reset --hard def5678
+Then cherry-pick the add data.txt file commit:
+git cherry-pick abc1234
+Now the branch has only two commits:
+1.	initial commit
+2.	add data.txt file
+________________________________________
+5️⃣ Push the changes forcefully to update the remote
+git push origin master --force
+(Replace master with the correct branch if it’s different.)
+This rewrites the history on the remote as required.
+________________________________________
+✅ Final verification:
+git log --oneline
+Should show only:
+abc1234 add data.txt file
+def5678 initial commit
+Task:35
+The Nautilus application development team was working on a git repository /usr/src/kodekloudrepos/blog present on Storage server in Stratos DC. One of the developers stashed some in-progress changes in this repository, but now they want to restore some of the stashed changes. Find below more details to accomplish this task:
+
+
+Look for the stashed changes under /usr/src/kodekloudrepos/blog git repository, and restore the stash with stash@{1} identifier. Further, commit and push your changes to the origin.
+
+Solution:
+✅ Step-by-step solution
+1️⃣ Go to the repository
+cd /usr/src/kodekloudrepos/blog
+2️⃣ Check the list of stashes
+git stash list
+You should see something like:
+stash@{0}: WIP on master: ...
+stash@{1}: WIP on master: ...
+________________________________________
+3️⃣ Apply the stash with stash@{1}
+git stash apply stash@{1}
+This restores the changes from that stash without removing it from the stash list.
+(Alternatively, you could use git stash pop stash@{1}, which applies and deletes it from the list.)
+________________________________________
+4️⃣ Add the restored files
+git add .
+________________________________________
+5️⃣ Commit the changes
+git commit -m "Restored changes from stash@{1}"
+________________________________________
+6️⃣ Push to the remote
+git push origin master
+(Replace master with the correct branch if needed.)
+________________________________________
+✅ Final Verification
+Check the commit history:
+git log --oneline
+You should see the new commit at the top.
+
+
+
+
+
+Task: 36
+The Nautilus DevOps team is gearing up to deploy applications on a Kubernetes cluster for migration purposes. A team member has been tasked with creating a ReplicaSet outlined below:
+
+Create a ReplicaSet using nginx image with latest tag (ensure to specify as nginx:latest) and name it nginx-replicaset.
+
+Apply labels: app as nginx_app, type as front-end.
+Name the container nginx-container. Ensure the replica count is 4.
+
+Note: The kubectl utility on jump_host is set up to interact with the Kubernetes cluster.
+Solution:
+✅ Task Breakdown
+You need to create a ReplicaSet in Kubernetes with the following requirements:
+•	Name: nginx-replicaset
+•	Image: nginx:latest
+•	Replicas: 4
+•	Container name: nginx-container
+•	Labels:
+o	app: nginx_app
+o	type: front-end
+________________________________________
+✅ Solution — Create the YAML file
+Create a file named nginx-replicaset.yaml with the following content:
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-replicaset
+  labels:
+    app: nginx_app
+    type: front-end
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: nginx_app
+      type: front-end
+  template:
+    metadata:
+      labels:
+        app: nginx_app
+        type: front-end
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+________________________________________
+✅ Apply the ReplicaSet
+1.	Save the above content into nginx-replicaset.yaml.
+2.	Run the command:
+kubectl apply -f nginx-replicaset.yaml
+________________________________________
+✅ Verify the ReplicaSet
+Check if it's created and running:
+kubectl get replicaset nginx-replicaset
+Check the pods:
+kubectl get pods -l app=nginx_app,type=front-end
+All 4 replicas should be up and running!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 37
+During a routine security audit, the team identified an issue on the Nautilus App Server. Some malicious content was identified within the website code. After digging into the issue they found that there might be more infected files. Before doing a cleanup they would like to find all similar files and copy them to a safe location for further investigation. Accomplish the task as per the following requirements:
+a. On App Server 2 at location /var/www/html/news find out all files (not directories) having .php extension.
+b. Copy all those files along with their parent directory structure to location /news on same server.
+c. Please make sure not to copy the entire /var/www/html/news directory content.
+
+Solution:
+✅ Solution
+1️⃣ Find all .php files under /var/www/html/news (but not directories)
+find /var/www/html/news -type f -name "*.php"
+________________________________________
+2️⃣ Copy only those files while preserving the directory structure to /news
+Use rsync or cp --parents, but here we'll solve it using find and cp --parents as it's commonly used in interviews.
+find /var/www/html/news -type f -name "*.php" -exec cp --parents {} /news/ \;
+✅ Explanation:
+•	find /var/www/html/news -type f -name "*.php" → finds only files with .php extension.
+•	-exec cp --parents {} /news/ \; → for each file found:
+o	--parents ensures the file’s full path from /var/www/html/news/... is preserved.
+o	Copies it into /news/, maintaining directory structure.
+________________________________________
+3️⃣ Confirm only matched files are copied
+cd /news
+find . -type f -name "*.php"
+You should see only the .php files from /var/www/html/news, not all files or directories.
+________________________________________
+✅ Notes:
+✔ This approach ✅ copies only files matching .php, and their parent directory structure,
+✔ It ❌ doesn’t copy other files or directories,
+✔ It’s safe ✅ for forensic or cleanup tasks,
+✔ It’s commonly asked in interviews to test find, cp, and file hierarchy management**.
+________________________________________
+✅ Alternative using rsync (if available):
+rsync -av --include='*/' --include='*.php' --exclude='*' /var/www/html/news/ /news/
+•	Includes only directories and .php files.
+•	Excludes all other files.
+
+Task: 38
+The Nautilus application development team has been working on a project repository /opt/news.git. This repo is cloned at /usr/src/kodekloudrepos on storage server in Stratos DC. They recently shared the following requirements with DevOps team:
+
+One of the developers is working on feature branch and their work is still in progress, however there are some changes which have been pushed into the master branch, the developer now wants to rebase the feature branch with the master branch without loosing any data from the feature branch, also they don't want to add any merge commit by simply merging the master branch into the feature branch. Accomplish this task as per requirements mentioned.
+
+Also remember to push your changes once done.
+
+Solution:
+
+✅ Step-by-step solution
+1️⃣ SSH into the storage server and go to the repository
+cd /usr/src/kodekloudrepos
+Verify that you're inside the correct repository:
+git remote -v
+You should see the remote pointing to /opt/news.git.
+________________________________________
+2️⃣ Checkout the feature branch
+git checkout feature
+________________________________________
+3️⃣ Rebase the feature branch onto master
+git rebase master
+This applies the commits from feature on top of master, without creating a merge commit.
+If there are conflicts, resolve them by editing the files, staging them, and continuing with:
+git rebase --continue
+________________________________________
+4️⃣ Push the updated feature branch to the remote
+Since you rewrote history, you need to force push:
+git push origin feature --force
+________________________________________
+✅ Verification
+You can check that the rebase worked by viewing the commit history:
+git log --oneline --graph --all
+You should see that feature is now based on top of master, and no merge commits are present.
+
+
+
+Task: 39
+The Nautilus DevOps team is setting up recurring tasks on different schedules. Currently, they're developing scripts to be executed periodically. To kickstart the process, they're creating cron jobs in the Kubernetes cluster with placeholder commands. Follow the instructions below:
+
+Create a cronjob named xfusion.
+Set Its schedule to something like */3 * * * *. You can set any schedule for now.
+Name the container cron-xfusion.
+Utilize the httpd image with latest tag (specify as httpd:latest).
+Execute the dummy command echo Welcome to xfusioncorp!.
+Ensure the restart policy is OnFailure.
+Solution:
+✅ Complete YAML manifest (xfusion-cronjob.yaml)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: xfusion
+spec:
+  schedule: "*/3 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cron-xfusion
+            image: httpd:latest
+            command: ["echo", "Welcome to xfusioncorp!"]
+          restartPolicy: OnFailure
+________________________________________
+✅ Apply this CronJob
+1.	Save the YAML as xfusion-cronjob.yaml.
+2.	Apply it using:
+kubectl apply -f xfusion-cronjob.yaml
+3.	Verify that it’s created:
+kubectl get cronjob xfusion
+4.	Check the logs when the job runs by first listing jobs:
+kubectl get jobs
+Then view logs from the pod created by the job:
+kubectl logs <pod-name>
+✅ Notes
+•	The schedule */3 * * * * means the job runs every 3 minutes.
+•	The OnFailure restart policy ensures that failed jobs are retried but not always restarted.
+•	The httpd image is used, but since the command is a dummy, it simply executes the echo.
+
+Task: 40
+As per new application requirements shared by the Nautilus project development team, serveral new packages need to be installed on all app servers in Stratos Datacenter. Most of them are completed except for epel-release.
+
+
+
+Therefore, install the epel-release package on all app-servers.
+Solution:
+✅ Steps you need to follow
+1️⃣ SSH into each server
+ssh tony@stapp01
+ssh steve@stapp02
+ssh banner@stapp03
+2️⃣ Install epel-release on each server
+Run the following command:
+sudo yum install epel-release -y
+Or if you're on a different system, it could be:
+sudo dnf install epel-release -y
+This will:
+✔ Add the EPEL repository
+✔ Allow you to install additional packages later
+3️⃣ Verify it’s installed
+rpm -q epel-release
+It should output something like:
+epel-release-7-13.noarch
+✅ Automating on All Servers
+If you have password-less SSH set up from jump_host as user thor, you can loop through them like this:
+for server in stapp01 stapp02 stapp03; do
+  ssh ${server_user}@${server} "sudo yum install epel-release -y"
+done
+Replace ${server_user} accordingly or run the command for each manually.
+✅ Option 2 – Write a loop that uses the correct username for each server
+for server in stapp01 stapp02 stapp03; do
+  if [ "$server" == "stapp01" ]; then
+    user="tony"
+  elif [ "$server" == "stapp02" ]; then
+    user="steve"
+  elif [ "$server" == "stapp03" ]; then
+    user="banner"
+  fi
+  ssh ${user}@${server} "sudo yum install epel-release -y"
+done
+This way, the script knows which username to use for each server.
+
+Task: 41
+Sarah and Max were working on writting some stories which they have pushed to the repository. Max has recently added some new changes and is trying to push them to the repository but he is facing some issues. Below you can find more details:
+--SSH into storage server using user max and password Max_pass123. Under /home/max you will find the story-blog repository. Try to push the changes to the origin repo and fix the issues. The story-index.txt must have titles for all 4 stories. Additionally, there is a typo in The Lion and the Mooose line where Mooose should be Mouse.
+--Click on the Gitea UI button on the top bar. You should be able to access the Gitea page. You can login to Gitea server from UI using username sarah and password Sarah_pass123 or username max and password Max_pass123.
+--Note: For these kind of scenarios requiring changes to be done in a web UI, please take screenshots so that you can share it with us for review in case your task is marked incomplete. You may also consider using a screen recording software such as loom.com to record and share your work.
+Solution:
+✅ Steps to Complete the Task
+SSH into the Storage Server as Max
+ssh max@ststor01
+•	Enter password: Max_pass123
+________________________________________
+Go to Max’s Repository Directory
+cd /home/max/story-blog
+________________________________________
+Check the Current Branch and Status
+git status
+•	You’ll likely see that you cannot push due to missing commits or conflicts.
+•	Pull the remote changes first
+•	git pull origin master --rebase
+Check which files have conflicts
+•	git status
+•	You’ll see files listed under Unmerged paths. These are the files with conflicts.
+Open and resolve the conflicts
+•	For each conflicted file:
+•	vi <file_name>
+Inside the file, you’ll see sections like this:
+<<<<<<< HEAD
+Remote version here
+=======
+Your changes here
+>>>>>>> your_commit
+•	Keep the correct version or combine changes as needed.
+•	Delete the conflict markers (<<<<<<<, =======, >>>>>>>) once you've resolved the conflict.
+For example, in lion-and-mouse.txt, fix the typo if it’s part of the conflict
+Mark the file as resolved
+After fixing the conflicts, run:
+git add <file_name>
+Repeat for each conflicted file.
+________________________________________
+Continue the rebase process
+Once all conflicts are resolved and added, run:
+git rebase --continue
+Git will either finish the rebase or prompt for further conflicts if any.
+Push the changes after the rebase completes
+git push origin master
+✅ Explanation:
+•	The top section (<<<<<<<) is from the remote branch (probably origin/master).
+•	The bottom section (======= to >>>>>>>) is from your local changes.
+•	The conflict is that:
+o	The remote branch has 3 stories.
+o	The local branch has 4 stories (with the typo “Mooose” instead of “Mouse”).
+
+
+
+
+
+
+
+
+
+Task: 42
+The Nautilus DevOps team is crafting jobs in the Kubernetes cluster. While they're developing actual scripts/commands, they're currently setting up templates and testing jobs with dummy commands. Please create a job template as per details given below:
+- Create a job named countdown-nautilus.
+- The spec template should be named countdown-nautilus (under metadata), and the container should be named container-countdown-nautilus
+- Utilize image fedora with latest tag (ensure to specify as fedora:latest), and set the restart policy to Never.
+- Execute the command sleep 5
+- Note: The kubectl utility on jump_host is set up to operate with the Kubernetes cluster.
+Solution:
+✅ YAML file content (countdown-nautilus.yaml):
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: countdown-nautilus
+spec:
+  template:
+    metadata:
+      name: countdown-nautilus
+    spec:
+      containers:
+      - name: container-countdown-nautilus
+        image: fedora:latest
+        command: ["sleep", "5"]
+      restartPolicy: Never
+✅ Steps to apply the job:
+1.	Create the YAML file:
+2.	vi countdown-nautilus.yaml
+(or use cat > countdown-nautilus.yaml if vi is not available)
+3.	Paste the above content and save the file.
+4.	Apply it using:
+5.	kubectl apply -f countdown-nautilus.yaml
+6.	Verify the job was created:
+7.	kubectl get jobs countdown-nautilus
+8.	Check the pod created by the job:
+kubectl get pods -l job-name=countdown-nautilus
+
+
+
+Task: 43
+The Nautilus application development team was working on a git repository /opt/media.git which is cloned under /usr/src/kodekloudrepos directory present on Storage server in Stratos DC. The team want to setup a hook on this repository, please find below more details: 
+--Merge the feature branch into the master branch, but before pushing your changes complete below point. 
+--Create a post-update hook in this git repository so that whenever any changes are pushed to the master branch, it creates a release tag with name release-2023-06-15, where 2023-06-15 is supposed to be the current date. 
+--For example if today is 20th June, 2023 then the release tag must be release-2023-06-20. Make sure you test the hook at least once and create a release tag for today's release. 
+--Finally remember to push your changes.
+Solution:
+Step 1: Go to the bare repo hooks directory
+cd /opt/media.git/hooks
+Step 2: Backup any existing post-update hook
+mv post-update post-update.bak 2>/dev/null
+________________________________________
+Step 3: Create a new post-update hook
+vim post-update
+Add the following content:
+#!/bin/bash
+current_date=$(date +"%Y-%m-%d")
+release_name="release-$current_date" 
+exec git tag $release_name
+
+Step 4: Make the hook executable
+chmod +x post-update
+________________________________________
+Step 5: Test the hook
+1.	Go to your local clone of the media repository:
+cd /usr/src/kodekloudrepos/media
+2.	Make a small change and commit it on master:
+echo "Test for post-update hook" >> test.txt
+git add test.txt
+git commit -m "Trigger post-update hook"
+3.	Push the changes:
+git push origin master
+________________________________________
+Step 6: Verify the tag
+On the bare repository:
+cd /opt/media.git
+git fetch --tags
+git tag
+You should now see a tag like release-2025-09-10 (today’s date).
+Task: 44
+The Nautilus DevOps team needs a time check pod created in a specific Kubernetes namespace for logging purposes. Initially, it's for testing, but it may be integrated into an existing cluster later. Here's what's required:
+
+
+Create a pod called time-check in the devops namespace. The pod should contain a container named time-check, utilizing the busybox image with the latest tag (specify as busybox:latest).
+
+Create a config map named time-config with the data TIME_FREQ=6 in the same namespace.
+
+Configure the time-check container to execute the command: while true; do date; sleep $TIME_FREQ;done. Ensure the result is written /opt/devops/time/time-check.log. Also, add an environmental variable TIME_FREQ in the container, fetching its value from the config map TIME_FREQ key.
+
+Create a volume log-volume and mount it at /opt/devops/time within the container.
+Solution:
+Here’s the complete YAML manifest you need. It creates the devops namespace, the ConfigMap, and the time-check pod with the specified settings:
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: time-config
+  namespace: devops
+data:
+  TIME_FREQ: "6"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: time-check
+  namespace: devops
+spec:
+  containers:
+  - name: time-check
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - while true; do date >> /opt/devops/time/time-check.log; sleep $TIME_FREQ; done
+    env:
+    - name: TIME_FREQ
+      valueFrom:
+        configMapKeyRef:
+          name: time-config
+          key: TIME_FREQ
+    volumeMounts:
+    - name: log-volume
+      mountPath: /opt/devops/time
+  volumes:
+  - name: log-volume
+    emptyDir: {}
+
+To apply this:
+1.	Save the above into a file like time-check-pod.yaml.
+2.	Run:
+kubectl apply -f time-check-pod.yaml
+3.	Verify the setup with:
+kubectl get ns
+kubectl get cm -n devops
+kubectl get pods -n devops
+kubectl logs time-check -n devops
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 45
+An application deployed on the Kubernetes cluster requires an update with new features developed by the Nautilus application development team. The existing setup includes a deployment named nginx-deployment and a service named nginx-service. Below are the necessary changes to be implemented without deleting the deployment and service:
+1.) Modify the service nodeport from 30008 to 32165  2.) Change the replicas count from 1 to 5           3.) Update the image from nginx:1.18 to nginx:latest
+Note: The kubectl utility on jump_host is configured to operate with the Kubernetes cluster.
+Solution: 
+✅ Task Breakdown:
+1.	Update the service’s NodePort from 30008 to 32165.
+2.	Scale the deployment from 1 replica to 5.
+3.	Update the deployment’s container image from nginx:1.18 to nginx:latest.
+________________________________________
+✅ Step 1 – Edit the Service NodePort
+Run this command to edit the service:
+kubectl edit svc nginx-service
+ports:
+  - nodePort: 30008
+•	Change it to:
+  - nodePort: 32165
+Save and exit.
+________________________________________
+✅ Step 2 – Scale the Deployment
+Run this command:
+kubectl scale deployment nginx-deployment --replicas=5
+This will increase the number of pods to 5.
+________________________________________
+✅ Step 3 – Update the Deployment Image
+kubectl set image deployment nginx-deployment nginx-container=nginx:latest
+Explanation:
+•	nginx-deployment: the name of the deployment
+•	nginx=nginx:latest: update the container named nginx to use the nginx:latest image
+________________________________________
+✅ Verify All Changes
+1.	Check the service:
+kubectl get svc nginx-service
+Ensure nodePort is 32165.
+2.	Check the deployment:
+kubectl get deployment nginx-deployment
+Ensure REPLICAS is 5 and IMAGE is nginx:latest.
+3.	Check the pods:
+kubectl get pods
+You should see 5 running pods with the correct image.
+Task: 46
+The Nautilus DevOps team is conducting application deployment tests on selected application servers. They require a nginx container deployment on Application Server 1. Complete the task with the following instructions:
+
+
+On Application Server 1 create a container named nginx_1 using the nginx image with the alpine tag. Ensure container is in a running state.
+Solution:
+
+
+✅ Final command you need to run on Application Server 1:
+docker run -d --name nginx_1 nginx:alpine
+
+
+✅ Breakdown:
+•	docker run → create and start a new container
+•	-d → run in detached mode (in the background)
+•	--name nginx_1 → name the container nginx_1
+•	nginx:alpine → use the nginx image with the alpine tag
+________________________________________
+
+✅ Verify the container is running:
+docker ps
+You should see the nginx_1 container in the list with status Up.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 47
+The Nautilus production support team and security team had a meeting last month in which they decided to use local yum repositories for maintaing packages needed for their servers. For now they have decided to configure a local yum repo on Nautilus Backup Server. This is one of the pending items from last month, so please configure a local yum repository on Nautilus Backup Server as per details given below.
+
+a. We have some packages already present at location /packages/downloaded_rpms/ on Nautilus Backup Server.
+
+b. Create a yum repo named localyum and make sure to set Repository ID to localyum. Configure it to use package's location /packages/downloaded_rpms/.
+
+c. Install package samba from this newly created repo.
+Solution:
+✅ Step 1 – Create the repo file
+Create a new file at /etc/yum.repos.d/localyum.repo with the following content:
+sudo vi /etc/yum.repos.d/localyum.repo
+Add the following:
+[localyum]
+name=Local YUM Repository
+baseurl=file:///packages/downloaded_rpms/
+enabled=1
+gpgcheck=0
+✔ Explanation:
+•	[localyum] → Repository ID is localyum
+•	name → Friendly name
+•	baseurl=file:///packages/downloaded_rpms/ → Points to the local directory
+•	enabled=1 → Enables the repository
+•	gpgcheck=0 → Disables GPG signature checking (for simplicity in this scenario)
+Save and exit.
+________________________________________
+✅ Step 2 – Clear the cache and check the repo
+sudo yum clean all
+sudo yum repolist
+You should see localyum in the list of repositories.
+________________________________________
+✅ Step 3 – Install the samba package
+sudo yum install -y samba
+It should install samba from the newly configured local repository.
+________________________________________
+✅ Final Verification
+rpm -q samba
+This should return the installed version of the samba package.
+
+
+
+Task: 48
+The Nautilus DevOps team is establishing a ReplicationController to deploy multiple pods for hosting applications that require a highly available infrastructure. Follow the specifications below to create the ReplicationController:
+
+
+Create a ReplicationController using the httpd image with latest tag, and name it httpd-replicationcontroller.
+
+Assign labels app as httpd_app, and type as front-end. Ensure the container is named httpd-container and set the replica count to 3.
+
+
+All pods should be running state post-deployment.
+Solution:
+✅ Complete YAML file
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: httpd-replicationcontroller
+spec:
+  replicas: 3
+  selector:
+    app: httpd_app
+    type: front-end
+  template:
+    metadata:
+      labels:
+        app: httpd_app
+        type: front-end
+    spec:
+      containers:
+      - name: httpd-container
+        image: httpd:latest
+________________________________________
+✅ Apply this configuration
+1.	Save it as httpd-replicationcontroller.yaml.
+2.	Run the following command:
+kubectl apply -f httpd-replicationcontroller.yaml
+________________________________________
+✅ Verify the setup
+1.	Check that the replication controller is created:
+kubectl get rc httpd-replicationcontroller
+2.	Check that all pods are running:
+kubectl get pods -l app=httpd_app,type=front-end
+You should see 3 pods in the Running state.
+
+Task: 49
+The Nautilus DevOps team possesses confidential data on App Server 1 in the Stratos Datacenter. A container named ubuntu_latest is running on the same server.
+
+
+
+Copy an encrypted file /tmp/nautilus.txt.gpg from the docker host to the ubuntu_latest container located at /tmp/. Ensure the file is not modified during this operation.
+Solution:
+You need to copy the file /tmp/nautilus.txt.gpg from the host’s filesystem into the running container ubuntu_latest, specifically into /tmp/ inside the container.
+
+Use this command:
+
+docker cp /tmp/nautilus.txt.gpg ubuntu_latest:/tmp/
+✅ Explanation:
+•	docker cp: copies files between host and container
+•	/tmp/nautilus.txt.gpg: the source file on the host
+•	ubuntu_latest:/tmp/: the destination directory inside the container
+•	The file will be copied without modification.
+________________________________________
+✅ Verify it worked:
+1.	Enter the container:
+docker exec -it ubuntu_latest bash
+2.	Check if the file exists:
+ls -l /tmp/nautilus.txt.gpg
+You should see the file listed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 50
+Nautilus project developers are planning to start testing on a new project. As per their meeting with the DevOps team, they want to test containerized environment application features. As per details shared with DevOps team, we need to accomplish the following task:
+
+
+a. Pull busybox:musl image on App Server 3 in Stratos DC and re-tag (create new tag) this image as busybox:media.
+
+Solution:
+✅ Solution for this task
+You are required to:
+1.	Pull the busybox:musl image on App Server 3.
+2.	Re-tag it as busybox:media.
+________________________________________
+✅ Commands to complete the task
+docker pull busybox:musl
+docker tag busybox:musl busybox:media
+________________________________________
+✅ Verify the images
+docker images
+You should see both:
+busybox   musl
+busybox   media
+________________________________________
+✅ Summary
+✔ Pulled the correct image busybox:musl
+✔ Tagged it as busybox:media without pulling again
+✔ Verified that both tags are available locally
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 51
+We encountered an issue with our Nginx and PHP-FPM setup on the Kubernetes cluster this morning, which halted its functionality. Investigate and rectify the issue:
+
+The pod name is nginx-phpfpm and configmap name is nginx-config. Identify and fix the problem.
+
+Once resolved, copy /home/thor/index.php file from the jump host to the nginx-container within the nginx document root. After this, you should be able to access the website using Website button on the top bar.
+Solution:
+📘 Complete Process You Followed
+Step 1 – Inspect the running pod
+You checked the existing pod configuration to understand how it’s set up:
+kubectl get pods
+kubectl get configmap nginx-config
+kubectl describe configmap nginx-config
+kubectl get pod nginx-phpfpm -o yaml > /tmp/nginx.yaml
+This allowed you to extract the pod definition and see where the mount paths were incorrectly set.
+________________________________________
+Step 2 – Identify incorrect paths
+You searched for the problematic volume mount path inside the YAML file:
+cat /tmp/nginx.yaml | grep /usr/share/nginx/html
+You found that nginx-container was mounting files at /usr/share/nginx/html, which should be /var/www/html.
+________________________________________
+Step 3 – Edit the YAML file
+You manually opened and edited /tmp/nginx.yaml and changed /usr/share/nginx/html to /var/www/html in all relevant places. This ensured that nginx and PHP containers share the same document root.
+________________________________________
+Step 4 – Apply the corrected configuration
+You applied the changes using the force option to update the existing pod:
+kubectl replace -f /tmp/nginx.yaml --force
+This recreated the pod with the correct configuration.
+________________________________________
+Step 5 – Copy the website file
+After ensuring the pod was running, you copied the index.php file into the correct directory in the container:
+kubectl cp /home/thor/index.php nginx-phpfpm:/var/www/html/index.php -c nginx-container
+________________________________________
+Step 6 – Validate the solution
+You checked that the website was working by accessing it via the lab interface or by running a curl command inside the container.
+
+Task: 52
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition.
+To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations.
+By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+For this task, create a key pair using Terraform with the following requirements:
+Name of the key pair should be datacenter-kp.
+Key pair type must be rsa.
+The private key file should be saved under /home/bob.
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+
+Note: Right-click under the EXPLORER section in VS Code and select Open in Integrated Terminal to launch the terminal.
+Solution:
+1. Move into the Terraform working directory
+cd /home/bob/terraform
+________________________________________
+2. Create the main.tf file
+# Generate RSA private key
+resource "tls_private_key" "datacenter_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# Create AWS key pair from the generated public key
+resource "aws_key_pair" "datacenter_kp" {
+  key_name   = "datacenter-kp"
+  public_key = tls_private_key.datacenter_key.public_key_openssh
+}
+
+# Save the private key to a file
+resource "local_file" "private_key" {
+  content  = tls_private_key.datacenter_key.private_key_pem
+  filename = "/home/bob/datacenter-kp.pem"
+}
+3. Initialize Terraform
+terraform init
+________________________________________
+4. Apply the configuration
+terraform apply -auto-approve
+Task: 53
+We have some users on all app servers in Stratos Datacenter. Some of them have been assigned some new roles and responsibilities, therefore their users need to be upgraded with sudo access so that they can perform admin level tasks.
+
+
+
+a. Provide sudo access to user anita on all app servers.
+
+
+b. Make sure you have set up password-less sudo for the user.
+Solution:
+✅ Steps:
+1.	Edit the sudoers file to give password-less sudo access to user anita
+Run the following command on each app server:
+echo "anita ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/anita
+✔ This creates a new file in /etc/sudoers.d/ which is safer than editing /etc/sudoers directly.
+2.	Set the correct permissions on the file
+sudo chmod 440 /etc/sudoers.d/anita
+✔ Ensures only root can modify it and it’s properly read by sudo.
+3.	Verify that anita can run commands without a password
+Switch to the user and test:
+sudo -l
+You should see that anita can run all commands without entering a password.
+________________________________________
+✅ Example session on one server:
+echo "anita ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/anita
+sudo chmod 440 /etc/sudoers.d/anita
+sudo -l
+________________________________________
+✅ Summary:
+✔ Provided anita with sudo access using a proper file in /etc/sudoers.d/
+✔ Configured it for password-less sudo
+✔ Ensured permissions are secure and compliant with best practices
+
+
+
+
+
+
+
+
+
+
+
+Task: 54
+As per details shared by the development team, the new application release has some dependencies on the back end. There are some packages/services that need to be installed on all app servers under Stratos Datacenter. As per requirements please perform the following steps:
+
+a. Install squid package on all the application servers.
+
+
+b. Once installed, make sure it is enabled to start during boot.
+Solution:
+
+✅ Steps:
+1.	Install the squid package
+Run this command on each app server:
+sudo yum install -y squid
+2.	Enable squid to start at boot
+Run this command on each app server:
+sudo systemctl enable squid
+3.	Start the squid service immediately (optional but recommended):
+sudo systemctl start squid
+4.	Verify the service is active
+sudo systemctl status squid
+✔ Check that the service is running and enabled.
+________________________________________
+✅ If you want to apply this across all app servers, you’ll need to repeat it on each one (or use automation tools like Ansible later).
+________________________________________
+✅ Example session on one server:
+sudo yum install -y squid
+sudo systemctl enable squid
+sudo systemctl start squid
+sudo systemctl status squid
+________________________________________
+✅ Summary:
+✔ Installed squid package using yum
+✔ Enabled it to start automatically at boot using systemctl enable
+✔ Started the service immediately to ensure it’s running
+✔ Verified its status
+
+
+
+
+
+
+
+Task: 55
+One of the Nautilus developer was working to test new changes on a container. He wants to keep a backup of his changes to the container. A new request has been raised for the DevOps team to create a new image from this container. Below are more details about it:
+
+a. Create an image media:datacenter on Application Server 3 from a container ubuntu_latest that is running on same server.
+
+Solution:
+
+✅ Steps to solve this task:
+1.	Commit the running container as a new image
+Use the docker commit command to create a new image from the container.
+docker commit ubuntu_latest media:datacenter
+✔ This takes the current state of the container ubuntu_latest and saves it as a new image media:datacenter.
+
+2.	Verify the new image has been created
+docker images
+✔ Look for media with the tag datacenter in the list.
+________________________________________
+✅ Example full solution:
+docker commit ubuntu_latest media:datacenter
+docker images
+________________________________________
+✅ Explanation:
+•	docker commit: Creates a new image from a container’s current state.
+•	media:datacenter: Specifies the name (media) and tag (datacenter) of the new image.
+•	docker images: Lists all available Docker images so you can confirm that the image was created.
+
