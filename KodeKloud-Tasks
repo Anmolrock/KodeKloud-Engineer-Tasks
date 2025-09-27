@@ -31,6 +31,10 @@ ________________________________________
 •	garrett is denied cron job access.
 
 
+
+
+
+
 Task: 2
 With the installation of new tools on the app servers within the Stratos Datacenter, certain functionalities now necessitate graphical user interface (GUI) access.
 Adjust the default runlevel on all App servers in Stratos Datacenter to enable GUI booting by default. It's imperative not to initiate a server reboot after completing this task.
@@ -2267,4 +2271,1639 @@ ________________________________________
 •	docker commit: Creates a new image from a container’s current state.
 •	media:datacenter: Specifies the name (media) and tag (datacenter) of the new image.
 •	docker images: Lists all available Docker images so you can confirm that the image was created.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 56
+One of the Nautilus DevOps team members was working to configure services on a kkloud container that is running on App Server 3 in Stratos Datacenter. Due to some personal work he is on PTO for the rest of the week, but we need to finish his pending work ASAP. Please complete the remaining work as per details given below:
+	
+a. Install apache2 in kkloud container using apt that is running on App Server 3 in Stratos Datacenter.
+
+b. Configure Apache to listen on port 5001 instead of default http port. Do not bind it to listen on specific IP or hostname only, i.e it should listen on localhost, 127.0.0.1, container ip, etc.
+
+c. Make sure Apache service is up and running inside the container. Keep the container in running state at the end.
+Solution:
+✅ Steps to complete the task
+1.	Access the container kkloud on App Server 3
+Run this on App Server 3:
+2.	docker exec -it kkloud bash
+3.	Update package lists and install Apache (apache2) using apt
+Inside the container:
+4.	apt update
+5.	apt install -y apache2
+6.	Change the Apache listening port to 5001
+Edit the file /etc/apache2/ports.conf and change or add:
+7.	Listen 5001
+You can use sed to automate this:
+sed -i 's/Listen 80/Listen 5001/' /etc/apache2/ports.conf
+8.	Ensure that the default virtual host configuration is also updated
+Edit /etc/apache2/sites-enabled/000-default.conf and replace <VirtualHost *:80> with <VirtualHost *:5001>:
+9.	sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:5001>/' /etc/apache2/sites-enabled/000-default.conf
+10.	Start and enable Apache service inside the container
+11.	service apache2 restart
+12.	service apache2 status
+or, if needed:
+systemctl restart apache2
+systemctl status apache2
+13.	Verify the container is running and Apache is listening on port 5001
+14.	netstat -tuln | grep 5001
+Or inside the container:
+curl http://localhost:5001
+
+
+
+Task:57
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations. By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+
+Use Terraform to create a security group under the default VPC with the following requirements:
+
+1) The name of the security group must be datacenter-sg.
+
+2) The description must be Security group for Nautilus App Servers.
+
+3) Add an inbound rule of type HTTP, with a port range of 80, and source CIDR range 0.0.0.0/0.
+
+4) Add another inbound rule of type SSH, with a port range of 22, and source CIDR range 0.0.0.0/0.
+
+Ensure that the security group is created in the us-east-1 region using Terraform. The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+Solution:
+✅ Here’s what your main.tf should look like:
+resource "aws_security_group" "datacenter_sg" {
+  name        = "datacenter-sg"
+  description = "Security group for Nautilus App Servers"
+  vpc_id      = data.aws_vpc.default.id
+
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "SSH from anywhere"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+data "aws_vpc" "default" {
+  default = true
+}
+________________________________________
+✅ Instructions:
+Make sure your provider.tf includes the correct AWS provider block with region us-east-1. Example:
+provider "aws" {
+  region = "us-east-1"
+}
+Save the above content as /home/bob/terraform/main.tf.
+Run the following commands:
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 58
+As per recent requirements shared by the Nautilus application development team, they need custom images created for one of their projects. Several of the initial testing requirements are already been shared with DevOps team. Therefore, create a docker file /opt/docker/Dockerfile (please keep D capital of Dockerfile) on App server 3 in Stratos DC and configure to build an image with the following requirements:
+
+
+
+a. Use ubuntu:24.04 as the base image.
+
+
+b. Install apache2 and configure it to work on 8089 port. (do not update any other Apache configuration settings like document root etc).
+Solution:
+✅ Steps to solve:
+Create the Dockerfile at /opt/docker/Dockerfile.
+Use ubuntu:24.04 as the base image.
+Install apache2.
+Configure Apache to listen on port 8089.
+Example content for /opt/docker/Dockerfile:
+FROM ubuntu:24.04
+
+RUN apt-get update && \
+    apt-get install -y apache2 && \
+    sed -i 's/80/8089/' /etc/apache2/ports.conf && \
+    sed -i 's/80/8089/' /etc/apache2/sites-enabled/000-default.conf
+
+EXPOSE 8089
+
+CMD ["apachectl", "-D", "FOREGROUND"]
+Next steps you should follow:
+Build the image from this Dockerfile:
+docker build -t custom-apache:latest /opt/docker
+Run a container to test it:
+docker run -d -p 8089:8089 --name apache-test custom-apache:latest
+Verify it’s working:
+curl http://localhost:8089
+You should see the default Apache2 page.
+
+
+
+
+
+
+
+
+Task: 59
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations. By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+
+Create a VPC named datacenter-vpc in region us-east-1 with any IPv4 CIDR block through terraform.
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+Solution:
+✅ /home/bob/terraform/main.tf
+resource "aws_vpc" "datacenter_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "datacenter-vpc"
+  }
+}
+✅ Explanation:
+1.	aws_vpc – Creates a new VPC.
+2.	cidr_block = "10.0.0.0/16" – You can choose any valid CIDR block (this is a common private network block).
+3.	tags – Adds a name tag to easily identify the VPC.
+________________________________________
+📦 Steps to follow:
+1.	Go to /home/bob/terraform.
+2.	Create a file named main.tf.
+3.	Copy and paste the code above into it.
+4.	Run these commands:
+5.	terraform init
+6.	terraform apply
+7.	Confirm the apply by typing yes when prompted.
+This will create the datacenter-vpc in the us-east-1 region with the provided configuration.
+
+
+
+
+
+
+Task: 60
+The system admins team of xFusionCorp Industries has noticed intermittent issues with DNS resolution in several apps . App Server 1 in Stratos Datacenter is having some DNS resolution issues, so we want to add some additional DNS nameservers on this server.
+
+
+As a temporary fix we have decided to go with Google public DNS (ipv4). Please make appropriate changes on this server.
+
+Solution: 
+
+
+✅ Solution
+You need to temporarily add Google’s public DNS servers on App Server 1.
+Google’s IPv4 public DNS servers are:
+•	8.8.8.8
+•	8.8.4.4
+Here’s how you can update the DNS settings:
+Steps:
+1.	Edit the /etc/resolv.conf file:
+2.	sudo nano /etc/resolv.conf
+3.	Add the following lines at the top (or wherever appropriate):
+4.	nameserver 8.8.8.8
+5.	nameserver 8.8.4.4
+6.	Save the file and exit.
+7.	Verify that DNS resolution works:
+8.	ping -c 4 google.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 61
+The Nautilus DevOps team needs to set up several docker environments for different applications. One of the team members has been assigned a ticket where he has been asked to create some docker networks to be used later. Complete the task based on the following ticket description:
+
+
+a. Create a docker network named as news on App Server 1 in Stratos DC.
+
+
+b. Configure it to use macvlan drivers.
+
+
+c. Set it to use subnet 172.168.0.0/24 and iprange 172.168.0.0/24.
+Solution:
+1. SSH into App Server 1
+ssh user@appserver1   # replace with actual username/host
+________________________________________
+2. Create the Docker network
+You need a macvlan network with the specified subnet and IP range.
+docker network create \
+  -d macvlan \
+  --subnet=172.168.0.0/24 \
+  --ip-range=172.168.0.0/24 \
+  --gateway=172.168.0.1 \
+  news
+________________________________________
+3. Verify the network
+docker network ls
+You should see:
+NETWORK ID     NAME      DRIVER    SCOPE
+xxxxx          news      macvlan   local
+To inspect details:
+docker network inspect news
+It should show:
+•	"Driver": "macvlan"
+•	"Subnet": "172.168.0.0/24"
+•	"IPRange": "172.168.0.0/24"
+•	"Gateway": "172.168.0.1"
+
+
+
+
+
+
+
+
+Task: 62
+To secure our Nautilus infrastructure in Stratos Datacenter we have decided to install and configure firewalld on all app servers. We have Apache and Nginx services running on these apps. Nginx is running as a reverse proxy server for Apache. We might have more robust firewall settings in the future, but for now we have decided to go with the given requirements listed below:
+
+a. Allow all incoming connections on Nginx port, i.e 80.
+b. Block all incoming connections on Apache port, i.e 8080.
+c. All rules must be permanent.
+d. Zone should be public.
+e. If Apache or Nginx services aren't running already, please make sure to start them.
+
+Solution: 
+
+1. Install firewalld
+sudo yum install firewalld -y     # RHEL/CentOS
+# or
+sudo apt-get install firewalld -y # Ubuntu/Debian
+2. Enable and start firewalld
+sudo systemctl enable firewalld
+sudo systemctl start firewalld
+3. Allow Nginx (port 80) in the public zone
+sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
+4. Block Apache (port 8080) in the public zone
+First remove if it’s already allowed:
+sudo firewall-cmd --zone=public --remove-port=8080/tcp --permanent
+(Blocking is the default deny behavior in firewalld, so you just need to make sure it’s not allowed.)
+5. Reload firewall to apply changes
+sudo firewall-cmd --reload
+6. Verify rules
+sudo firewall-cmd --zone=public --list-all
+You should see ports: 80/tcp but not 8080/tcp.
+7. Ensure Apache and Nginx services are running
+# For Apache (port 8080)
+sudo systemctl enable httpd
+sudo systemctl start httpd
+# For Nginx (port 80)
+sudo systemctl enable nginx
+sudo systemctl start nginx
+________________________________________
+✅ Final state:
+•	Port 80 (Nginx) → Allowed
+•	Port 8080 (Apache) → Blocked
+•	Both services → Running
+•	Rules → Permanent in public zone
+Task: 63
+The Nautilus DevOps team is strategically planning the migration of a portion of their infrastructure to the AWS cloud. Acknowledging the magnitude of this endeavor, they have chosen to tackle the migration incrementally rather than as a single, massive transition. Their approach involves creating Virtual Private Clouds (VPCs) as the initial step, as they will be provisioning various services under different VPCs.
+
+Create a VPC named nautilus-vpc in us-east-1 region with 192.168.0.0/24 IPv4 CIDR using terraform.
+
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+Solution:
+Here’s the Terraform configuration you can put in /home/bob/terraform/main.tf to create the requested VPC 👇
+
+resource "aws_vpc" "nautilus_vpc" {
+  cidr_block       = "192.168.0.0/24"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "nautilus-vpc"
+  }
+}
+✅ What this does:
+•	Uses the AWS provider in us-east-1 region.
+•	Creates a VPC named nautilus-vpc with CIDR block 192.168.0.0/24.
+•	Sets default tenancy.
+•	Adds a Name tag so the VPC is easily identifiable in the AWS console.
+________________________________________
+After placing this in main.tf, you’d typically run inside /home/bob/terraform:
+terraform init
+terraform apply -auto-approve
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 64
+The Nautilus DevOps team is planning to host an application on a nginx-based container. There are number of tickets already been created for similar tasks. One of the tickets has been assigned to set up a nginx container on Application Server 3 in Stratos Datacenter. Please perform the task as per details mentioned below:
+
+
+a. Pull nginx:alpine-perl docker image on Application Server 3.
+
+
+b. Create a container named cluster using the image you pulled.
+
+
+c. Map host port 6300 to container port 80. Please keep the container in running state.
+Solution:
+🔹 Steps to Perform
+1.	Login via jump host → App Server 3
+ssh thor@jump_host.stratos.xfusioncorp.com
+# password: mjolnir123
+
+ssh banner@stapp03.stratos.xfusioncorp.com
+# password: BigGr33n
+2.	Pull the required image
+docker pull nginx:alpine-perl
+3.	Run the container
+docker run -d --name cluster -p 6300:80 nginx:alpine-perl
+This ensures:
+•	Container name = cluster
+•	Host port 6300 mapped to container port 80
+•	Container runs in background (-d)
+4.	Verify
+docker ps
+You should see container cluster running.
+________________________________________
+✅ Final state:
+•	nginx:alpine-perl image pulled
+•	cluster container created and running
+•	Port mapping 6300 → 80 active
+
+
+
+
+
+
+
+
+
+Task: 65
+The Nautilus DevOps team is strategically planning the migration of a portion of their infrastructure to the AWS cloud. Acknowledging the magnitude of this endeavor, they have chosen to tackle the migration incrementally rather than as a single, massive transition. Their approach involves creating Virtual Private Clouds (VPCs) as the initial step, as they will be provisioning various services under different VPCs.
+
+For this task, create a VPC named xfusion-vpc in the us-east-1 region with the Amazon-provided IPv6 CIDR block using terraform.
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+Solution:
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_vpc" "xfusion_vpc" {
+  cidr_block                       = "10.0.0.0/16"
+  assign_generated_ipv6_cidr_block = true
+  instance_tenancy                 = "default"
+
+  tags = {
+    Name = "xfusion-vpc"
+  }
+}
+
+After saving the file, from inside /home/bob/terraform, you would typically run:
+terraform init
+terraform apply -auto-approve
+This will provision the xfusion-vpc with an Amazon-provided IPv6 block.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 66
+xFusionCorp Industries has planned to set up a common email server in Stork DC. After several meetings and recommendations they have decided to use postfix as their mail transfer agent and dovecot as an IMAP/POP3 server. We would like you to perform the following steps:
+1. Install and configure postfix on Stork DC mail server.
+2. Create an email account anita@stratos.xfusioncorp.com identified by B4zNgHA7Ya.
+3. Set its mail directory to /home/anita/Maildir.
+4. Install and configure dovecot on the same server.
+Solution:
+1. Install Postfix
+sudo yum install postfix -y   # CentOS/RHEL
+# or
+sudo apt-get install postfix -y   # Ubuntu/Debian
+During installation, choose:
+•	Internet Site as the mail configuration type.
+•	System mail name: stratos.xfusioncorp.com
+________________________________________
+2. Create Email Account (anita)
+sudo useradd anita -m
+echo "B4zNgHA7Ya" | sudo passwd --stdin anita   # RHEL
+# or
+echo "anita:B4zNgHA7Ya" | sudo chpasswd          # Debian/Ubuntu
+________________________________________
+3. Configure Maildir for User
+Edit /etc/postfix/main.cf and add/update:
+home_mailbox = Maildir/
+Then create Maildir for Anita:
+sudo -u anita mkdir -p /home/anita/Maildir
+sudo -u anita maildirmake.dovecot /home/anita/Maildir
+sudo -u anita maildirmake.dovecot /home/anita/Maildir/.Drafts
+sudo -u anita maildirmake.dovecot /home/anita/Maildir/.Sent
+sudo -u anita maildirmake.dovecot /home/anita/Maildir/.Trash
+Restart postfix:
+sudo systemctl enable postfix
+sudo systemctl restart postfix
+________________________________________
+4. Install & Configure Dovecot
+sudo yum install dovecot -y    # CentOS/RHEL
+# or
+sudo apt-get install dovecot-core dovecot-imapd -y   # Ubuntu/Debian
+Edit /etc/dovecot/dovecot.conf:
+protocols = imap pop3 lmtp
+Edit /etc/dovecot/conf.d/10-mail.conf:
+mail_location = maildir:~/Maildir
+Edit /etc/dovecot/conf.d/10-auth.conf:
+disable_plaintext_auth = no
+auth_mechanisms = plain login
+Enable system users for auth in /etc/dovecot/conf.d/10-master.conf:
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+Start services:
+sudo systemctl enable dovecot
+sudo systemctl restart dovecot
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 67
+The Nautilus application development team shared static website content that needs to be hosted on the httpd web server using a containerised platform. The team has shared details with the DevOps team, and we need to set up an environment according to those guidelines. Below are the details:
+
+
+
+a. On App Server 1 in Stratos DC create a container named httpd using a docker compose file /opt/docker/docker-compose.yml (please use the exact name for file).
+
+
+b. Use httpd (preferably latest tag) image for container and make sure container is named as httpd; you can use any name for service.
+
+
+c. Map 80 number port of container with port 8089 of docker host.
+
+
+d. Map container's /usr/local/apache2/htdocs volume with /opt/devops volume of docker host which is already there. (please do not modify any data within these locations).
+Solution:
+Docker Compose File: /opt/docker/docker-compose.yml
+version: '3.9'
+
+services:
+  web:
+    image: httpd:latest
+    container_name: httpd
+    ports:
+      - "8089:80"
+    volumes:
+      - /opt/devops:/usr/local/apache2/htdocs
+    restart: always
+Explanation:
+•	Service name is web (can be any name).
+•	Container uses the httpd:latest image and is explicitly named httpd.
+•	Host port 8089 is mapped to container port 80.
+•	Host directory /opt/devops is mounted to container’s /usr/local/apache2/htdocs.
+•	restart: always ensures the container starts automatically if the server reboots.
+After creating the file, starting the container with docker-compose up -d will run the httpd server as required.
+
+
+
+
+Task: 68
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations. By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+
+For this task, allocate an Elastic IP address named devops-eip using Terraform.
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+Solution:
+1️⃣ Go to your Terraform working directory
+cd /home/bob/terraform
+________________________________________
+2️⃣ Create a main.tf file
+vim main.tf
+________________________________________
+3️⃣ Add the Terraform configuration to allocate an Elastic IP
+provider "aws" {
+  region = "us-east-1"   # choose the region you want
+}
+
+resource "aws_eip" "devops-eip" {
+  vpc = true
+  tags = {
+    Name = "devops-eip"
+  }
+}
+________________________________________
+4️⃣ Initialize Terraform
+terraform init
+________________________________________
+5️⃣ Check what Terraform will create
+terraform plan
+________________________________________
+6️⃣ Apply the configuration
+terraform apply
+•	Confirm with yes when prompted.
+•	This will allocate the Elastic IP and tag it as devops-eip.
+
+Task: 69
+The Nautilus DevOps team is working to create new images per requirements shared by the development team. One of the team members is working to create a Dockerfile on App Server 1 in Stratos DC. While working on it she ran into issues in which the docker build is failing and displaying errors. Look into the issue and fix it to build an image as per details mentioned below:
+
+
+a. The Dockerfile is placed on App Server 1 under /opt/docker directory.
+
+
+b. Fix the issues with this file and make sure it is able to build the image.
+
+
+c. Do not change base image, any other valid configuration within Dockerfile, or any of the data been used — for example, index.html.
+Solution:
+🟢 Fixed Dockerfile
+Here’s the corrected version:
+FROM httpd:2.4.43
+
+# Change default port
+RUN sed -i "s/Listen 80/Listen 8080/g" /usr/local/apache2/conf/httpd.conf
+
+# Enable SSL modules
+RUN sed -i '/LoadModule ssl_module modules\/mod_ssl.so/s/^#//g' /usr/local/apache2/conf/httpd.conf
+RUN sed -i '/LoadModule socache_shmcb_module modules\/mod_socache_shmcb.so/s/^#//g' /usr/local/apache2/conf/httpd.conf
+
+# Enable SSL config
+RUN sed -i '/Include conf\/extra\/httpd-ssl.conf/s/^#//g' /usr/local/apache2/conf/httpd.conf
+
+# Copy SSL certs
+COPY certs/server.crt /usr/local/apache2/conf/server.crt
+COPY certs/server.key /usr/local/apache2/conf/server.key
+________________________________________
+✅ Next steps:
+cd /opt/docker
+docker build -t my-httpd-ssl .
+Then run:
+docker run -d --name httpd-ssl -p 8080:8080 -p 443:443 my-httpd-ssl
+And check:
+curl -k https://localhost
+
+
+Task: 70
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units.
+
+For this task, create an EC2 instance using Terraform with the following requirements:
+
+The name of the instance must be xfusion-ec2.
+
+Use the Amazon Linux ami-0c101f26f147fa7fd to launch this instance.
+
+The Instance type must be t2.micro.
+
+Create a new RSA key named xfusion-kp.
+
+Attach the default (available by default) security group.
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to provision the instance.
+Solution:
+Got it 👍 — here’s how your main.tf inside /home/bob/terraform should look for this requirement:
+provider "aws" {
+  region = "us-east-1"   # or whichever default region is available in your environment
+}
+
+# Create RSA key pair
+resource "tls_private_key" "xfusion_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_key_pair" "xfusion_kp" {
+  key_name   = "xfusion-kp"
+  public_key = tls_private_key.xfusion_key.public_key_openssh
+}
+
+# Launch EC2 instance
+resource "aws_instance" "xfusion_ec2" {
+  ami           = "ami-0c101f26f147fa7fd"
+  instance_type = "t2.micro"
+  key_name      = aws_key_pair.xfusion_kp.key_name
+
+  vpc_security_group_ids = ["default"]
+
+  tags = {
+    Name = "xfusion-ec2"
+  }
+}
+✅ Key points:
+•	AMI: set to ami-0c101f26f147fa7fd (Amazon Linux).
+•	Instance type: t2.micro.
+•	Key pair: xfusion-kp created dynamically from Terraform.
+•	Security group: attached to the default one.
+•	Tag: instance name = xfusion-ec2.
+After creating the file, run these commands inside /home/bob/terraform:
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 71
+The production support team of xFusionCorp Industries is working on developing some bash scripts to automate different day to day tasks. One is to create a bash script for taking websites backup. They have a static website running on App Server 1 in Stratos Datacenter, and they need to create a bash script named beta_backup.sh which should accomplish the following tasks. (Also remember to place the script under /scripts directory on App Server 1).
+
+
+
+a. Create a zip archive named xfusioncorp_beta.zip of /var/www/html/beta directory.
+
+
+b. Save the archive in /backup/ on App Server 1. This is a temporary storage, as backups from this location will be clean on weekly basis. Therefore, we also need to save this backup archive on Nautilus Backup Server.
+
+
+c. Copy the created archive to Nautilus Backup Server server in /backup/ location.
+
+
+d. Please make sure script won't ask for password while copying the archive file. Additionally, the respective server user (for example, tony in case of App Server 1) must be able to run it.
+
+
+e. Do not use sudo inside the script.
+
+Note:
+The zip package must be installed on given App Server before executing the script. This package is essential for creating the zip archive of the website files. Install it manually outside the script.
+Solution:
+✅ Stepwise Solution for official_backup.sh
+1.	Login to App Server 3 as banner user:
+2.	ssh banner@stapp03
+3.	Make sure zip is installed (outside the script):
+4.	sudo yum install -y zip   # CentOS/RHEL
+5.	# or
+6.	sudo apt-get install -y zip   # Ubuntu/Debian
+7.	Create /scripts directory (if not already exists):
+8.	mkdir -p /scripts
+9.	Create the script official_backup.sh:
+10.	vi /scripts/official_backup.sh
+Script content:
+#!/bin/bash
+
+# Create a zip archive of the official website
+zip -r /backup/xfusioncorp_official.zip /var/www/html/official
+
+# Copy the archive to Nautilus Backup Server
+scp /backup/xfusioncorp_official.zip clint@stbkp01:/backup
+11.	Make it executable:
+12.	chmod +x /scripts/official_backup.sh
+13.	Set up passwordless SSH from App Server 3 (banner user) → Backup Server (clint user):
+14.	ssh-keygen -t rsa -b 2048 -N "" -f ~/.ssh/id_rsa
+15.	ssh-copy-id clint@stbkp01
+16.	Test passwordless SSH:
+17.	ssh clint@stbkp01
+18.	exit
+✅ Should not ask for a password.
+19.	Run the script as banner user:
+20.	/scripts/official_backup.sh
+21.	Verify:
+On App Server 3:
+22.	ls -l /backup/xfusioncorp_official.zip
+On Backup Server:
+ssh clint@stbkp01 "ls -l /backup/xfusioncorp_official.zip"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 72
+The Nautilus Application development team recently finished development of one of the apps that they want to deploy on a containerized platform. The Nautilus Application development and DevOps teams met to discuss some of the basic pre-requisites and requirements to complete the deployment. The team wants to test the deployment on one of the app servers before going live and set up a complete containerized stack using a docker compose fie. Below are the details of the task:
+
+
+
+On App Server 1 in Stratos Datacenter create a docker compose file /opt/security/docker-compose.yml (should be named exactly).
+
+
+The compose should deploy two services (web and DB), and each service should deploy a container as per details below:
+
+
+For web service:
+
+
+a. Container name must be php_host.
+
+
+b. Use image php with any apache tag. Check here for more details.
+
+
+c. Map php_host container's port 80 with host port 5002
+
+
+d. Map php_host container's /var/www/html volume with host volume /var/www/html.
+
+
+For DB service:
+
+
+a. Container name must be mysql_host.
+
+
+b. Use image mariadb with any tag (preferably latest). Check here for more details.
+
+
+c. Map mysql_host container's port 3306 with host port 3306
+
+
+d. Map mysql_host container's /var/lib/mysql volume with host volume /var/lib/mysql.
+
+
+e. Set MYSQL_DATABASE=database_host and use any custom user ( except root ) with some complex password for DB connections.
+After running docker-compose up you can access the app with curl command curl <server-ip or hostname>:5002/
+For more details check here.
+Note: Once you click on FINISH button, all currently running/stopped containers will be destroyed and stack will be deployed again using your compose file.
+Solution:
+✅ Step-by-Step Solution
+1.	Login to App Server 1 (jump host → stapp01).
+2.	Create directory (if not already there):
+3.	mkdir -p /opt/security
+4.	Create docker-compose.yml file:
+vi /opt/security/docker-compose.yml
+Add the following content:
+version: '3.8'
+
+services:
+  web:
+    image: php:8.1-apache
+    container_name: php_host
+    ports:
+      - "5002:80"
+    volumes:
+      - /var/www/html:/var/www/html
+
+  db:
+    image: mariadb:latest
+    container_name: mysql_host
+    environment:
+      MYSQL_DATABASE: database_host
+      MYSQL_USER: nautuser
+      MYSQL_PASSWORD: Str0ngP@ss!
+      MYSQL_ROOT_PASSWORD: R00tPass123   # root pwd required by mariadb image
+    ports:
+      - "3306:3306"
+    volumes:
+      - /var/lib/mysql:/var/lib/mysql
+•  Run the stack:
+cd /opt/security
+docker-compose up -d
+•  Verify containers:
+docker ps
+You should see php_host and mysql_host running.
+•  Test app access:
+curl http://<stapp01_IP>:5002/
+Task: 73
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations. By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+For this task, create an AMI from an existing EC2 instance named xfusion-ec2 using Terraform.
+Name of the AMI should be xfusion-ec2-ami, make sure AMI is in available state.
+The Terraform working directory is /home/bob/terraform. Update the main.tf file (do not create a separate .tf file) to create the AMI.
+Solution:
+Here’s how you can update your main.tf:
+# Provision EC2 instance
+resource "aws_instance" "ec2" {
+  ami           = "ami-0c101f26f147fa7fd"
+  instance_type = "t2.micro"
+  vpc_security_group_ids = [
+    "sg-5cc504421c90d5afe"
+  ]
+  tags = {
+    Name = "xfusion-ec2"
+  }
+}
+# Create an AMI from the existing EC2 instance
+resource "aws_ami_from_instance" "xfusion_ami" {
+  name               = "xfusion-ec2-ami"
+  source_instance_id = aws_instance.ec2.id
+  description        = "AMI created from xfusion-ec2 instance"
+}
+
+Next steps:
+Initialize Terraform (if not done yet):
+
+terraform init
+Plan the changes:
+terraform plan
+
+
+Apply the configuration:
+
+terraform apply
+Task: 74
+A python app needed to be Dockerized, and then it needs to be deployed on App Server 2. We have already copied a requirements.txt file (having the app dependencies) under /python_app/src/ directory on App Server 2. Further complete this task as per details mentioned below:
+
+
+
+Create a Dockerfile under /python_app directory:
+
+Use any python image as the base image.
+Install the dependencies using requirements.txt file.
+Expose the port 3003.
+Run the server.py script using CMD.
+
+Build an image named nautilus/python-app using this Dockerfile.
+
+
+Once image is built, create a container named pythonapp_nautilus:
+
+Map port 3003 of the container to the host port 8096.
+
+Once deployed, you can test the app using curl command on App Server 2.
+Solution:
+1️⃣ Create the Dockerfile
+Go to /python_app and create a Dockerfile:
+cd /python_app
+vi Dockerfile
+Paste the following content:
+# Use Python base image
+FROM python:3.9-slim
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy requirements file first (for efficient caching)
+COPY src/requirements.txt /app/
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY src/ /app/
+
+# Expose port
+EXPOSE 3003
+
+# Run the application
+CMD ["python", "server.py"]
+________________________________________
+2️⃣ Build the Docker image
+Run the following command from /python_app:
+docker build -t nautilus/python-app .
+________________________________________
+3️⃣ Run the container
+Create and start a container with port mapping:
+docker run -d --name pythonapp_nautilus -p 8096:3003 nautilus/python-app
+________________________________________
+4️⃣ Test the application
+Use curl to test from App Server 2:
+curl http://localhost:8096/
+(or use server IP if accessed externally).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 75
+The Nautilus DevOps team is strategizing the migration of a portion of their infrastructure to the AWS cloud. Recognizing the scale of this undertaking, they have opted to approach the migration in incremental steps rather than as a single massive transition. To achieve this, they have segmented large tasks into smaller, more manageable units. This granular approach enables the team to execute the migration in gradual phases, ensuring smoother implementation and minimizing disruption to ongoing operations. By breaking down the migration into smaller tasks, the Nautilus DevOps team can systematically progress through each stage, allowing for better control, risk mitigation, and optimization of resources throughout the migration process.
+For this task, create an AWS EBS volume using Terraform with the following requirements:
+Name of the volume should be devops-volume.
+Volume type must be gp3.
+Volume size must be 2 GiB.
+Ensure the volume is created in us-east-1.
+Solution:
+1️⃣ Navigate to Terraform working directory
+cd /home/bob/terraform
+________________________________________
+2️⃣ Update main.tf
+Add the following Terraform code (don’t create a separate .tf file):
+# Create an AWS EBS volume
+resource "aws_ebs_volume" "devops-volume" {
+  availability_zone = "us-east-1a"   # pick a valid AZ inside us-east-1
+  size              = 2
+  type              = "gp3"
+
+  tags = {
+    Name = "devops-volume"
+  }
+}
+⚠️ Note: You must choose an availability zone (like us-east-1a, us-east-1b, etc.) because EBS volumes are AZ-specific. Make sure it matches the AZ of the EC2 instance you plan to attach this volume to.
+________________________________________
+3️⃣ Initialize Terraform
+terraform init
+4️⃣ Plan the changes
+terraform plan
+You should see Terraform planning to create an EBS volume with 2 GiB, gp3 type, and name devops-volume.
+5️⃣ Apply the changes
+terraform apply
+Type yes when prompted.
+Task: 76
+
+There is a static website running in Stratos Datacenter. They have already configured the app servers and code is already deployed there. To make it work properly, they need to configure LBR server. There are number of options for that, but team has decided to go with HAproxy. FYI, apache is running on port 3000 on all app servers. Complete this task as per below details.
+
+
+
+a. Install and configure HAproxy on LBR server using yum only and make sure all app servers are added to HAproxy load balancer. HAproxy must serve on default http port (Note: Please do not remove stats socket /var/lib/haproxy/stats entry from haproxy default config.).
+
+b. Once done, you can access the website using StaticApp button on the top bar.
+Solution:
+🔧 Steps to Solve:
+1.	Install HAProxy using yum
+2.	sudo yum install haproxy -y
+3.	Edit the HAProxy configuration file
+Open /etc/haproxy/haproxy.cfg and configure frontend + backend sections.
+Make sure you keep the default stats socket line.
+Example config (append/modify properly):
+frontend http_front
+    bind *:80
+    default_backend http_back
+
+backend http_back
+    balance roundrobin
+    server stapp01 172.16.238.10:3000 check
+    server stapp02 172.16.238.11:3000 check
+    server stapp03 172.16.238.12:3000 check 
+🔹 Replace <APP_SERVER1_IP>, <APP_SERVER2_IP>, <APP_SERVER3_IP> with the actual IPs of the App servers in Stratos DC.
+4.	Enable and restart HAProxy
+5.	sudo systemctl enable haproxy
+6.	sudo systemctl restart haproxy
+7.	Validation
+o	Click on StaticApp button in KodeKloud UI.
+o	It should now serve traffic from HAProxy → Apache on App servers (port 3000).
+
+
+
+
+
+Task: 77
+The Nautilus DevOps team is diving into Kubernetes for application management. One team member has a task to create a pod according to the details below:
+
+
+Create a pod named pod-nginx using the nginx image with the latest tag. Ensure to specify the tag as nginx:latest.
+
+Set the app label to nginx_app, and name the container as nginx-container.
+Solution:
+Here’s the manifest you can apply:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx
+  labels:
+    app: nginx_app
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx:latest
+Apply it with:
+kubectl apply -f pod-nginx.yaml
+Verify:
+kubectl get pods -o wide
+kubectl describe pod pod-nginx
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 78
+The Nautilus DevOps team has some volumes in different regions in their AWS account. They are going to setup some automated backups so that all important data can be backed up on regular basis. For now they shared some requirements to take a snapshot of one of the volumes they have.
+
+Create a snapshot of an existing volume named xfusion-vol in us-east-1 region using terraform.
+
+1) The name of the snapshot must be xfusion-vol-ss.
+
+2) The description must be Xfusion Snapshot.
+
+3) Make sure the snapshot status is completed before submitting the task.
+Solution:
+Here’s the corrected Terraform snippet:
+provider "aws" {
+  region = "us-east-1"
+}
+
+# Reference the existing volume
+data "aws_ebs_volume" "xfusion_vol" {
+  filter {
+    name   = "tag:Name"
+    values = ["xfusion-vol"]
+  }
+}
+
+# Create snapshot
+resource "aws_ebs_snapshot" "xfusion_vol_ss" {
+  volume_id   = data.aws_ebs_volume.xfusion_vol.id
+  description = "Xfusion Snapshot"
+  tags = {
+    Name = "xfusion-vol-ss"
+  }
+}
+________________________________________
+Apply the Terraform plan
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+
+
+
+
+
+Task: 79
+The Nautilus DevOps team is setting up monitoring in their AWS account. As part of this, they need to create a CloudWatch alarm.
+
+Using Terraform, perform the following:
+
+Task Details:
+Create a CloudWatch alarm named devops-alarm.
+The alarm should monitor CPU utilization of an EC2 instance.
+Trigger the alarm when CPU utilization exceeds 80%.
+Set the evaluation period to 5 minutes.
+Use a single evaluation period.
+Solution:
+1️⃣ Terraform Configuration
+Update your main.tf in your Terraform working directory (/home/bob/terraform):
+# Reference the existing EC2 instance by Name tag (replace with your instance name if needed)
+resource "aws_cloudwatch_metric_alarm" "devops_alarm" {
+  alarm_name          = "devops-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 300          # 5 minutes
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "Triggered when CPU utilization exceeds 80%"
+  
+  # No dimensions, so it’s a general EC2 CPU metric alarm
+}
+
+2️⃣ Apply Terraform
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+
+
+
+
+
+
+
+
+
+Task: 80
+s part of the data migration process, the Nautilus DevOps team is actively creating several S3 buckets on AWS. They plan to utilize both private and public S3 buckets to store the relevant data. Given the ongoing migration of other infrastructure to AWS, it is logical to consolidate data storage within the AWS environment as well.
+
+Create a public S3 bucket named datacenter-s3-4196 using Terraform.
+
+Ensure the bucket is accessible publicly once created by setting the proper ACL.
+
+The Terraform working directory is /home/bob/terraform. Create the main.tf file (do not create a different .tf file) to accomplish this task.
+
+Notes:
+
+Create the resources only in the us-east-1 region.
+Right-click under the EXPLORER section in VS Code and select Open in Integrated Terminal to launch the terminal.
+The name of the S3 bucket should be based on datacenter-s3-4196.
+You can use the ACL settings to ensure the bucket is publicly accessible.
+Solution:
+resource "aws_s3_bucket" "datacenter_bucket" {
+  bucket = "datacenter-s3-25924"
+}
+
+resource "aws_s3_bucket_public_access_block" "disable_block" {
+  bucket = aws_s3_bucket.datacenter_bucket.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+is enough to complete the task successfully in KodeKloud.
+
+You can now apply:
+
+terraform init
+terraform apply -auto-approve
+and verify with:
+
+== aws s3 ls | grep datacenter-s3-25924
+
+
+
+
+
+Task: 81
+how to do this task There is a critical issue going on with the Nautilus application in Stratos DC. The production support team identified that the application is unable to connect to the database. After digging into the issue, the team found that mariadb service is down on the database server.
+
+Look into the issue and fix the same.
+
+Solution:
+Steps to troubleshoot and fix MariaDB service
+1.	Check detailed logs
+sudo journalctl -u mariadb -xe
+sudo tail -n 50 /var/log/mariadb/mariadb.log
+•	Look for permission errors, corrupted files, or missing directories.
+2.	Check ownership and permissions of the data directory
+sudo ls -ld /var/lib/mysql
+sudo chown -R mysql:mysql /var/lib/mysql
+sudo chmod -R 750 /var/lib/mysql
+•	MariaDB needs proper ownership (mysql:mysql) for /var/lib/mysql.
+3.	Check SELinux/AppArmor (if enabled)
+# Check if SELinux is enforcing
+getenforce
+
+# Temporarily set to permissive to test
+sudo setenforce 0
+•	Sometimes the service cannot access /var/lib/mysql due to SELinux restrictions.
+4.	Check if another MariaDB/MySQL process is running
+sudo ps aux | grep mariadb
+•	Kill any stale processes if present:
+sudo kill -9 <PID>
+5.	Attempt a manual start
+sudo systemctl start mariadb
+sudo systemctl status mariadb
+6.	Check disk space
+df -h
+•	MariaDB cannot start if the disk is full.
+7.	If corrupted, attempt recovery
+•	Backup /var/lib/mysql and try to run:
+sudo mysqld --skip-grant-tables --skip-networking &
+•	Then investigate corrupted tables.
+________________________________________
+✅ Once the service starts successfully:
+sudo systemctl enable mariadb
+sudo systemctl status mariadb
+•	Test connectivity from the app server:
+mysql -h 172.16.239.10 -u <user> -p
+
+
+Task: 82
+As part of the data migration process, the Nautilus DevOps team is actively creating several S3 buckets on AWS using Terraform. They plan to utilize both private and public S3 buckets to store the relevant data. Given the ongoing migration of other infrastructure to AWS, it is logical to consolidate data storage within the AWS environment as well.
+
+Create an S3 bucket using Terraform with the following details:
+
+1) The name of the S3 bucket must be devops-s3-6695.
+
+2) The S3 bucket must block all public access, making it a private bucket.
+Solution:
+# Create the S3 bucket
+resource "aws_s3_bucket" "devops_s3_6695" {
+  bucket = "devops-s3-6695"
+}
+
+resource "aws_s3_bucket_public_access_block" "block_public_access" {
+  bucket = aws_s3_bucket.devops_s3_6695.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+Steps to complete the task:
+Go to the Terraform working directory (/home/bob/terraform).
+
+Save the above code in main.tf.
+
+Run:
+
+terraform init
+terraform apply -auto-approve
+Verify the bucket:
+
+aws s3 ls
+and confirm the bucket devops-s3-6695 exists.
+
+
+
+
+
+
+
+
+Task: 83
+We are working on hardening Apache web server on all app servers. As a part of this process we want to add some of the Apache response headers for security purpose. We are testing the settings one by one on all app servers. As per details mentioned below enable these headers for Apache:
+
+
+Install httpd package on App Server 1 using yum and configure it to run on 6100 port, make sure to start its service.
+
+
+Create an index.html file under Apache's default document root i.e /var/www/html and add below given content in it.
+
+
+Welcome to the xFusionCorp Industries!
+
+
+Configure Apache to enable below mentioned headers:
+
+
+X-XSS-Protection header with value 1; mode=block
+
+
+X-Frame-Options header with value SAMEORIGIN
+
+
+X-Content-Type-Options header with value nosniff
+Solution:
+1. Install Apache (httpd)
+•	Use yum to install Apache:
+•	yum install -y httpd
+________________________________________
+2. Change Apache to listen on port 6100
+•	Edit the Apache configuration file:
+•	vi /etc/httpd/conf/httpd.conf
+•	Look for the line:
+•	Listen 80
+and change it to:
+Listen 6100
+________________________________________
+3. Start & Enable Apache
+•	Start the service and enable it at boot:
+•	systemctl start httpd
+•	systemctl enable httpd
+________________________________________
+4. Add Index Page
+•	Create /var/www/html/index.html:
+•	echo "Welcome to the xFusionCorp Industries!" > /var/www/html/index.html
+________________________________________
+5. Configure Security Headers
+•	Open /etc/httpd/conf/httpd.conf (or create a new file under /etc/httpd/conf.d/security.conf for better practice).
+•	Add the following inside <VirtualHost *:6100> block or globally:
+•	<IfModule mod_headers.c>
+•	    Header set X-XSS-Protection "1; mode=block"
+•	    Header set X-Frame-Options "SAMEORIGIN"
+•	    Header set X-Content-Type-Options "nosniff"
+•	</IfModule>
+•	Make sure the headers module is loaded (by default it is, but if not add: LoadModule headers_module modules/mod_headers.so).
+________________________________________
+6. Restart Apache
+systemctl restart httpd
+________________________________________
+7. Test
+•	Access the server on port 6100:
+•	curl -I http://localhost:6100
+•	You should see headers like:
+•	X-XSS-Protection: 1; mode=block
+•	X-Frame-Options: SAMEORIGIN
+•	X-Content-Type-Options: nosniff
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 84
+xFusionCorp Industries uses some monitoring tools to check the status of every service, application, etc running on the systems. Recently, the monitoring system identified that Apache service is not running on some of the Nautilus Application Servers in Stratos Datacenter.
+
+
+
+1. Identify the faulty Nautilus Application Server and fix the issue. Also, make sure Apache service is up and running on all Nautilus Application Servers. Do not try to stop any kind of firewall that is already running.
+
+
+2. Apache is running on 6200 port on all Nautilus Application Servers and its document root must be /var/www/html on all app servers.
+
+
+3. Finally you can test from jump host using curl command to access Apache on all app servers and it should be reachable and you should get some static page. E.g. curl http://172.16.238.10:6200/.
+Solution:
+🔍 Step 1: Identify which App Server has the faulty Apache service
+•	From the jump host, try accessing Apache on all 3 app servers (stapp01, stapp02, stapp03):
+•	curl http://172.16.238.10:6200/
+•	curl http://172.16.238.11:6200/
+•	curl http://172.16.238.12:6200/
+•	The server(s) that fail to respond or give connection refused → have the issue.
+________________________________________
+🔧 Step 2: Fix Apache on the faulty server
+•	SSH into that specific app server:
+•	ssh tony@stapp01  # or steve@stapp02 / banner@stapp03 (depending on which one is faulty)
+•	Check service status:
+•	sudo systemctl status httpd
+•	If not running, try to start it:
+•	sudo systemctl start httpd
+•	Enable at boot:
+•	sudo systemctl enable httpd
+________________________________________
+⚙️ Step 3: Verify configuration
+•	Confirm that Apache is configured to listen on port 6200:
+•	sudo grep -i "Listen" /etc/httpd/conf/httpd.conf
+→ Should be Listen 6200.
+If not, update it:
+sudo vi /etc/httpd/conf/httpd.conf
+Change the line:
+Listen 6200
+•	Confirm the document root:
+•	grep -i "DocumentRoot" /etc/httpd/conf/httpd.conf
+→ Should be /var/www/html.
+________________________________________
+📄 Step 4: Ensure static page exists
+•	If /var/www/html/index.html doesn’t exist, create it:
+•	echo "Welcome to Nautilus Application" | sudo tee /var/www/html/index.html
+________________________________________
+✅ Step 5: Test again
+•	From jump host:
+•	curl http://172.16.238.10:6200/
+•	curl http://172.16.238.11:6200/
+•	curl http://172.16.238.12:6200/
+•	All should return the static page content.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Task: 85
+We have confidential data that needs to be transferred to a remote location, so we need to encrypt that data.We also need to decrypt data we received from a remote location in order to understand its content.
+
+
+
+On storage server in Stratos Datacenter we have private and public keys stored at /home/*_key.asc. Use these keys to perform the following actions.
+
+
+- Encrypt /home/encrypt_me.txt to /home/encrypted_me.asc.
+
+
+- Decrypt /home/decrypt_me.asc to /home/decrypted_me.txt. (Passphrase for decryption and encryption is kodekloud).
+
+
+- The user ID you can use is kodekloud@kodekloud.com.
+Solution:
+1.	ssh natasha@ststor01
+2.	sudo su –
+3.	cd /home/
+4.	ls
+5.	gpg --import public_key.asc
+6.	gpg --import private_key.asc
+7.	gpg --list-keys
+8.	gpg --list-secret-keys
+9.	gpg --encrypt -r kodekloud@kodekloud.com --armor < encrypt_me.txt  -o encrypted_me.asc
+10.	 gpg --decrypt decrypt_me.asc > decrypted_me.txt
+11.	Ls
+12.	cat decrypted_me.txt
+13.	cat decrypt_me.asc
+14.	cat encrypt_me.txt
+15.	cat encrypted_me.asc
+
+
+
+
+
+
+
+
+
+
+
+Task: 86
+The Nautilus DevOps team is ready to launch a new application, which they will deploy on app servers in Stratos Datacenter. They are expecting significant traffic/usage of squid on app servers after that. This will generate massive logs, creating huge log files. To utilise the storage efficiently, they need to compress the log files and need to rotate old logs. Check the requirements shared below:
+a. In all app servers install squid package.
+b. Using logrotate configure squid logs rotation to monthly and keep only 3 rotated logs.
+(If by default log rotation is set, then please update configuration as needed)
+Solution:
+Step 1: Install Squid
+1.	Connect to each app server.
+2.	Install Squid using yum (for CentOS/RHEL-based systems):
+sudo yum install squid -y
+3.	Start and enable the Squid service:
+sudo systemctl start squid
+sudo systemctl enable squid
+4.	Verify that Squid is running:
+systemctl status squid
+Step 2: Configure Log Rotation with Logrotate
+1.	Open or create a logrotate configuration file for Squid. Usually, it’s at /etc/logrotate.d/squid.
+sudo vi /etc/logrotate.d/squid
+2.	Add the following configuration (or update if it exists):
+/var/log/squid/*.log {
+    monthly
+    rotate 3
+    compress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        systemctl reload squid > /dev/null 2>/dev/null || true
+    endscript}
+Explanation:
+•	monthly → Rotate logs every month.
+•	rotate 3 → Keep only the last 3 rotated logs.
+•	compress → Compress old logs to save space.
+•	missingok → Don’t error if logs are missing.
+•	notifempty → Don’t rotate empty logs.
+•	postrotate → Reload Squid to start a new log file after rotation.
+Step 3: Test Logrotate
+Run logrotate manually to ensure configuration works:
+sudo logrotate -d /etc/logrotate.d/squid   # Dry run (no changes)
+sudo logrotate -f /etc/logrotate.d/squid   # Force rotation
+✅ After this, Squid logs will rotate monthly, compress old logs, and retain only 3 rotated files.
 
